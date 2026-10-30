@@ -1,0 +1,39 @@
+{
+  "name": "olam-3-cloudflare",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "description": "OLAM 3.0 event registration, QR entry passes and gate check-in on Cloudflare Workers + D1 (installable PWA).",
+  "scripts": {
+    "dev": "vite build && wrangler dev",
+    "dev:ui": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p worker/tsconfig.json --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply olam3-db --local",
+    "db:migrate": "wrangler d1 migrations apply olam3-db --remote",
+    "secrets": "node scripts/set-secrets.mjs",
+    "deploy": "vite build && wrangler deploy",
+    "test:api": "node --test tests/api.test.mjs"
+  },
+  "dependencies": {
+    "hono": "^4.13.14",
+    "jspdf": "^4.2.1",
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vite-plugin-pwa": "^2.0.0",
+    "wrangler": "^4.156.0"
+  }
+}

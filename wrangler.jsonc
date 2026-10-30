@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "olam-3",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "6d9e3d29acf08caf7195b62ad23d3f77",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+
+  // The React PWA (built by Vite into ./dist) is served as static assets.
+  // /api/* always hits the Worker; every other unknown path falls back to index.html (SPA routing).
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "olam3-db",
+      "database_id": "8cc22c84-891f-437f-8d8d-d2fa356a8129",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    // The first super admin is created on the first sign-in with this email + the INITIAL_ADMIN_PASSWORD secret.
+    "INITIAL_ADMIN_EMAIL": "cliffincliffin@gmail.com",
+    "JWT_ISSUER": "olam3-api"
+  }
+  // Secrets (set with `npm run secrets` or `npx wrangler secret put <NAME>`):
+  //   JWT_SECRET              random string, signs staff sessions and derives QR pass tokens
+  //   INITIAL_ADMIN_PASSWORD  bootstrap password for INITIAL_ADMIN_EMAIL (must be changed on first sign-in)
+}
