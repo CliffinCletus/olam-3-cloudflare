@@ -1,6 +1,6 @@
-import { KeyRound, Mail, ScanLine, ShieldCheck, UserCheck, UserPlus, UserX, Users } from "lucide-react";
+import { KeyRound, Mail, ScanLine, ShieldCheck, Trash2, UserCheck, UserPlus, UserX, Users } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { type AuthUser, type Branch, type Role, api, patch, post } from "../../api";
+import { type AuthUser, type Branch, type Role, api, del, patch, post } from "../../api";
 import { StaffShell, useStaff } from "../../components/Staff";
 import { Alert, Button, Chips, Field, IconButton, Modal, Pill, Toggle, WithIcon } from "../../components/ui";
 
@@ -23,6 +23,8 @@ export default function Manage() {
   const [busy, setBusy] = useState(false);
   const [resetFor, setResetFor] = useState<Staff | null>(null);
   const [resetPw, setResetPw] = useState("");
+  const [deleting, setDeleting] = useState<Staff | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -37,6 +39,14 @@ export default function Manage() {
     try { await patch(`/staff/${s.id}`, body); if (okText) setMsg({ ok: true, text: okText }); }
     catch (e: any) { setMsg({ ok: false, text: e.message }); }
     refresh();
+  }
+
+  async function confirmDelete() {
+    const s = deleting!;
+    setDeleteBusy(true); setMsg(null);
+    try { await del(`/staff/${s.id}`); setMsg({ ok: true, text: `${s.name || s.email} deleted.` }); }
+    catch (e: any) { setMsg({ ok: false, text: e.message }); }
+    finally { setDeleteBusy(false); setDeleting(null); refresh(); }
   }
 
   async function create() {
@@ -77,6 +87,7 @@ export default function Manage() {
                     <IconButton small label={`Reset password for ${s.name || s.email}`} icon={<KeyRound />} onClick={() => { setResetFor(s); setResetPw(""); }} testId={`staff-reset-btn-${s.id}`} />
                     <IconButton small variant={s.active ? "danger" : "success"} label={s.active ? `Deactivate ${s.name || s.email}` : `Reactivate ${s.name || s.email}`} icon={s.active ? <UserX /> : <UserCheck />}
                       onClick={() => update(s, { active: !s.active }, `${s.name || s.email} ${s.active ? "deactivated" : "reactivated"}.`)} testId={`staff-active-toggle-${s.id}`} />
+                    <IconButton small variant="danger" label={`Delete ${s.name || s.email}`} icon={<Trash2 />} onClick={() => setDeleting(s)} testId={`staff-delete-btn-${s.id}`} />
                   </div>
                 ) : null}
               </div>
@@ -123,6 +134,17 @@ export default function Manage() {
         <div className="modal-actions">
           <Button variant="secondary" onClick={() => setResetFor(null)}>Cancel</Button>
           <Button disabled={resetPw.length < 8} testId="staff-reset-confirm" onClick={async () => { const s = resetFor!; setResetFor(null); await update(s, { password: resetPw }, `Temporary password set for ${s.name || s.email}.`); }}>Set password</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!deleting} onClose={() => !deleteBusy && setDeleting(null)}>
+        <div className="modal-ico"><Trash2 /></div>
+        <h2>Delete this staff account?</h2>
+        <p className="sub">{deleting?.name || deleting?.email} · {deleting ? ROLE_META[deleting.role].label : ""}{deleting?.name ? ` · ${deleting.email}` : ""}</p>
+        <Alert tone="warning">They're signed out and can't sign in again. Approvals, check-ins and activity-log entries they made are kept. This can't be undone; to block them only for now, deactivate the account instead.</Alert>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={() => setDeleting(null)} disabled={deleteBusy} testId="staff-delete-cancel">Cancel</Button>
+          <Button variant="danger" icon={<Trash2 />} loading={deleteBusy} onClick={confirmDelete} testId="staff-delete-confirm">Delete</Button>
         </div>
       </Modal>
     </StaffShell>

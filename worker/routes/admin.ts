@@ -246,10 +246,37 @@ admin.patch("/staff/:uid", superAdmin, async (c) => {
   return c.json(userOut(await db.prepare("SELECT * FROM users WHERE id = ?").bind(uid).first()));
 });
 
+admin.delete("/staff/:uid", superAdmin, async (c) => {
+  const me = c.get("user");
+  const uid = c.req.param("uid");
+  const db = c.env.DB;
+  const cur = await db.prepare("SELECT * FROM users WHERE id = ?").bind(uid).first<any>();
+  if (!cur) fail(404, "Not found");
+  if (uid === me.id) fail(400, "You cannot delete your own account");
+  // The bootstrap admin would be re-created by the next sign-in with INITIAL_ADMIN_PASSWORD, so it can only be deactivated.
+  if (cur.email === (c.env.INITIAL_ADMIN_EMAIL || "").toLowerCase().trim()) fail(400, "This is the main admin account. Deactivate it instead.");
+  if (cur.role === "super_admin" && cur.active) {
+    const n = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'super_admin' AND active = 1").first<{ n: number }>();
+    if ((n?.n ?? 0) <= 1) fail(400, "At least one active super admin must remain");
+  }
+  // Approvals and check-ins keep their copied names; the activity log falls back to deleted_users.
+  await db.batch([
+    db.prepare("INSERT OR REPLACE INTO deleted_users (id, email, name, role, deleted_at, deleted_by) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(uid, cur.email, cur.name, cur.role, nowIso(), me.id),
+    db.prepare("DELETE FROM users WHERE id = ?").bind(uid),
+  ]);
+  await audit(db, me.id, "staff.delete", uid, { email: cur.email, name: cur.name, role: cur.role });
+  return c.json({ deleted: true });
+});
+
 // --- Audit log ----------------------------------------------------------------------------
 admin.get("/audit", superAdmin, async (c) => {
   const { results } = await c.env.DB
-    .prepare("SELECT l.*, u.name AS actor_name, u.email AS actor_email FROM audit_logs l LEFT JOIN users u ON u.id = l.actor_id ORDER BY l.timestamp DESC LIMIT 200")
+    .prepare(
+      `SELECT l.*, COALESCE(u.name, d.name || ' (deleted)') AS actor_name, COALESCE(u.email, d.email) AS actor_email
+       FROM audit_logs l LEFT JOIN users u ON u.id = l.actor_id LEFT JOIN deleted_users d ON d.id = l.actor_id
+       ORDER BY l.timestamp DESC LIMIT 200`,
+    )
     .all<any>();
   return c.json(results.map((r) => ({ ...r, meta: safeJson(r.meta) })));
 });

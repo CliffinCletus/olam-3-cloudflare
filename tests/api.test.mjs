@@ -477,3 +477,29 @@ test("weak new password rejected", async () => {
   const r = await call("/auth/change-password", { method: "POST", token: sc.token, body: { current_password: "StaffPass123", new_password: "onlyletters" } });
   assert.equal(r.status, 400);
 });
+
+test("super admin deletes staff; history keeps their name; guard rails", async () => {
+  const t = await adminToken();
+  const sc = await makeStaff("scanner");
+  const coord = await makeStaff("coordinator", { branch_id: "br-1" });
+  assert.equal((await call(`/staff/${sc.user.id}`, { method: "DELETE", token: coord.token })).status, 403);
+
+  const r = await call(`/staff/${sc.user.id}`, { method: "DELETE", token: t });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(!(await call("/staff", { token: t })).data.some((u) => u.id === sc.user.id));
+  assert.equal((await call("/auth/me", { token: sc.token })).status, 401); // old session is dead
+  assert.equal((await call("/auth/login", { method: "POST", body: { email: sc.user.email, password: "StaffPass123" } })).status, 401);
+  assert.equal((await call(`/staff/${sc.user.id}`, { method: "DELETE", token: t })).status, 404);
+
+  const log = (await call("/audit", { token: t })).data;
+  assert.ok(log.some((l) => l.action === "staff.delete" && l.target_id === sc.user.id));
+  for (const l of log.filter((x) => x.actor_id === sc.user.id)) assert.match(l.actor_name, /\(deleted\)$/);
+  const me = (await call("/auth/me", { token: t })).data;
+  const self = await call(`/staff/${me.id}`, { method: "DELETE", token: t });
+  assert.equal(self.status, 400);
+  assert.match(self.data.detail, /own account|main admin/);
+
+  // Same email can be added again afterwards.
+  const again = await call("/staff", { method: "POST", token: t, body: { email: sc.user.email, name: "Back", password: "TempPass99", role: "scanner" } });
+  assert.equal(again.status, 200, JSON.stringify(again.data));
+});
