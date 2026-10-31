@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../api";
-import { BranchFilter, PageHead, useBranches, useStaff } from "../../components/Staff";
-import { Pill, Spinner, type Tone } from "../../components/ui";
+import { api, downloadCsv } from "../../api";
+import { BranchFilter, PageHead, canExportCsv, useBranches, useStaff } from "../../components/Staff";
+import { Button, Pill, Spinner, type Tone } from "../../components/ui";
 
 type CheckIn = { id: string; checked_in_at: string; scanner_name?: string; station?: string; full_name: string; reference: string; batch: string; branch_name?: string };
 type Attempt = { id: string; result: string; attempted_at: string; scanner_name?: string; station?: string; full_name?: string; reference?: string; batch?: string; branch_name?: string };
@@ -32,6 +32,14 @@ export default function Attendance() {
   }, []);
   useEffect(() => { if (user) load(""); }, [user, load]);
 
+  async function exportCsv() {
+    const branchName = branches.find((b) => b.id === branchId)?.name;
+    const name = ["olam-attendance", view === "checkins" ? "checkins" : "refused-scans", branchName].filter(Boolean).join("-").toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    const qs = new URLSearchParams({ view, ...(branchId ? { branch_id: branchId } : {}) });
+    const m = await downloadCsv(`/export/attendance.csv?${qs}`, `${name}.csv`);
+    if (m) setErr(m);
+  }
+
   return (
     <div className="staff-shell">
       <PageHead eyebrow="ATTENDANCE HISTORY" title="Check-in log">
@@ -43,6 +51,11 @@ export default function Attendance() {
       </PageHead>
       <main className="staff-body">
         <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}><button type="button" className="chip-btn" onClick={() => load(branchId)}>↻ Refresh</button></div>
+        {canExportCsv(user) ? (
+          <Button variant="navy" small className="mb-12" testId="attendance-export-btn" onClick={exportCsv}>
+            Export {view === "checkins" ? `check-ins (${data?.checkins.length ?? 0})` : `refused scans (${data?.attempts.length ?? 0})`} as CSV
+          </Button>
+        ) : null}
         {loading ? <Spinner /> : null}
         {err ? <p className="err" data-testid="attendance-error">{err}</p> : null}
         {!loading && data && view === "checkins" ? (

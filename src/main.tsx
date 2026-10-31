@@ -22,6 +22,7 @@ const Absent = lazy(() => import("./pages/staff/Absent"));
 const FacultyReport = lazy(() => import("./pages/staff/FacultyReport"));
 const EventSummary = lazy(() => import("./pages/staff/EventSummary"));
 const AuditLog = lazy(() => import("./pages/staff/AuditLog"));
+const Notifications = lazy(() => import("./pages/staff/Notifications"));
 
 function AuthRedirects() {
   const nav = useNavigate();
@@ -55,6 +56,7 @@ function App() {
           <Route path="/staff/faculty-report" element={<FacultyReport />} />
           <Route path="/staff/event-summary" element={<EventSummary />} />
           <Route path="/staff/audit" element={<AuditLog />} />
+          <Route path="/staff/notifications" element={<Notifications />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

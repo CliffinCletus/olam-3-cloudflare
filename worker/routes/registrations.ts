@@ -8,11 +8,11 @@ import {
   assertBranchAccess,
   audit,
   clientIp,
-  coordinatorBranch,
   displayName,
   getRegistration,
   getSettings,
   regOut,
+  registrationFilter,
   requireRoles,
   secret,
 } from "../lib/ctx";
@@ -21,6 +21,7 @@ import type { Env } from "../lib/util";
 
 const regs = new Hono<AppEnv>();
 const reviewer = requireRoles("super_admin", "coordinator");
+const superAdmin = requireRoles("super_admin");
 
 const text = (label: string, min: number, max: number) =>
   z
@@ -45,8 +46,8 @@ const RegistrationIn = z.object({
   privacy_accepted: z.literal(true, { error: "You must accept the privacy notice." }),
 });
 
-const DUP_EMAIL = "This email address is already registered. Use 'Retrieve my pass' with your reference to check your status.";
-const DUP_PHONE = "This mobile number is already registered. Use 'Retrieve my pass' with your reference to check your status.";
+const DUP_EMAIL = "This email address is already registered. Use 'Retrieve my pass' with your email and mobile number to check your status.";
+const DUP_PHONE = "This mobile number is already registered. Use 'Retrieve my pass' with your email and mobile number to check your status.";
 
 regs.post("/registrations", async (c) => {
   const db = c.env.DB;
@@ -93,17 +94,21 @@ regs.post("/registrations", async (c) => {
 });
 
 const LookupIn = z.object({
-  reference: z.string().trim().min(4, { error: "Enter your registration reference" }).max(20),
   email: z.string().trim().pipe(z.email({ error: "Enter the email you registered with" })),
-});
+  mobile: z.string().trim().max(20).optional(),
+  reference: z.string().trim().max(20).optional(),
+}).refine((b) => phoneKey(b.mobile || "").length === 10 || (b.reference || "").length >= 4, { error: "Enter the mobile number you registered with" });
 
-/** Public retrieval: reference AND matching email. Returns status and, if approved, the derived pass token. */
+/** Public retrieval: email AND matching mobile number (or reference). Returns status and, if approved, the derived pass token. */
 regs.post("/registrations/lookup", async (c) => {
   const db = c.env.DB;
   await rateLimit(db, "lookup-ip", clientIp(c), 15, 60);
   const body = await readBody(c.req.raw, LookupIn);
-  const reg = await getRegistration(db, "reference", body.reference.toUpperCase());
-  if (!reg || reg.email.toLowerCase() !== body.email.toLowerCase()) fail(404, "No matching registration found");
+  const reg = await db.prepare(`${REG_SELECT} WHERE r.email = ?`).bind(body.email.toLowerCase()).first<any>();
+  const matches = !!reg && (body.mobile
+    ? reg.mobile_key === phoneKey(body.mobile)
+    : reg.reference === (body.reference || "").toUpperCase());
+  if (!matches) fail(404, "No registration found for that email and mobile number");
   let pass_token: string | null = null;
   if (reg.status === "approved") {
     const p = await db.prepare("SELECT version FROM passes WHERE registration_id = ? AND active = 1").bind(reg.id).first<{ version: number }>();
@@ -132,25 +137,12 @@ regs.post("/pass/verify", async (c) => {
 
 // --- Review --------------------------------------------------------------------------
 regs.get("/registrations", reviewer, async (c) => {
-  const user = c.get("user");
-  const where: string[] = [];
-  const params: unknown[] = [];
-  const own = coordinatorBranch(user);
-  const branchId = own ?? c.req.query("branch_id");
-  if (branchId) { where.push("r.branch_id = ?"); params.push(branchId); }
-  const status = c.req.query("status_") || c.req.query("status");
-  if (status) {
-    if (!["pending", "approved", "rejected"].includes(status)) fail(422, "Invalid status filter");
-    where.push("r.status = ?"); params.push(status);
-  }
-  const q = (c.req.query("q") || "").trim();
-  if (q) {
-    const like = `%${q.replace(/[\\%_]/g, (m) => "\\" + m)}%`;
-    where.push(`(${["full_name", "faculty_name", "batch_no", "mobile", "email", "reference", "batch"].map((f) => `r.${f} LIKE ? ESCAPE '\\'`).join(" OR ")})`);
-    for (let i = 0; i < 7; i++) params.push(like);
-  }
-  const sql = `${REG_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY r.created_at DESC LIMIT 5000`;
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all();
+  const f = registrationFilter(c.get("user"), {
+    branch_id: c.req.query("branch_id"),
+    status: c.req.query("status_") || c.req.query("status"),
+    q: c.req.query("q"),
+  });
+  const { results } = await c.env.DB.prepare(`${REG_SELECT} ${f.sql} ORDER BY r.created_at DESC LIMIT 5000`).bind(...f.params).all();
   return c.json(results.map(regOut));
 });
 
@@ -231,6 +223,44 @@ regs.post("/registrations/:rid/reject", reviewer, async (c) => {
   ]);
   await audit(db, user.id, "registration.reject", rid, { reason: body.reason });
   return c.json(regOut(await getRegistration(db, "id", rid)));
+});
+
+// --- Delete (super admin only, e.g. to clear test data) ------------------------------------
+/** Removes registrations with their pass, check-in, refused-scan log and push subscriptions. Returns how many existed. */
+async function deleteRegistrations(db: D1Database, ids: string[]): Promise<number> {
+  let deleted = 0;
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const marks = chunk.map(() => "?").join(", ");
+    const res = await db.batch([
+      db.prepare(`DELETE FROM scan_attempts WHERE reference IN (SELECT reference FROM registrations WHERE id IN (${marks}))`).bind(...chunk),
+      db.prepare(`DELETE FROM attendance WHERE registration_id IN (${marks})`).bind(...chunk),
+      db.prepare(`DELETE FROM passes WHERE registration_id IN (${marks})`).bind(...chunk),
+      db.prepare(`DELETE FROM push_subscriptions WHERE registration_id IN (${marks})`).bind(...chunk),
+      db.prepare(`DELETE FROM registrations WHERE id IN (${marks})`).bind(...chunk),
+    ]);
+    deleted += res[4].meta.changes ?? 0;
+  }
+  return deleted;
+}
+
+regs.post("/registrations/bulk-delete", superAdmin, async (c) => {
+  const user = c.get("user");
+  const body = await readBody(c.req.raw, z.object({ ids: z.array(z.string().max(40)).min(1, { error: "Select at least one registration" }).max(1000) }));
+  const ids = [...new Set(body.ids)];
+  const deleted = await deleteRegistrations(c.env.DB, ids);
+  await audit(c.env.DB, user.id, "registration.bulk_delete", null, { count: deleted });
+  return c.json({ deleted });
+});
+
+regs.delete("/registrations/:rid", superAdmin, async (c) => {
+  const user = c.get("user");
+  const rid = c.req.param("rid");
+  const reg = await c.env.DB.prepare("SELECT reference, full_name FROM registrations WHERE id = ?").bind(rid).first<any>();
+  if (!reg) fail(404, "Not found");
+  await deleteRegistrations(c.env.DB, [rid]);
+  await audit(c.env.DB, user.id, "registration.delete", rid, { reference: reg.reference, name: reg.full_name });
+  return c.json({ deleted: 1 });
 });
 
 export default regs;

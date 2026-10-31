@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isIOS, isStandalone } from "../lib/device";
 
 type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<unknown> };
 
@@ -13,8 +14,6 @@ if (typeof window !== "undefined") {
   });
 }
 
-const isStandalone = () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true;
-const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 /** "Add to Home Screen": Android/desktop Chrome get the native install prompt; iPhone gets Safari instructions. */
 export function InstallApp() {

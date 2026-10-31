@@ -148,7 +148,7 @@ export default function Scanner() {
             <div className="dv" />
             <div className="br" data-testid="scanner-welcome-branch">{result.registration.branch_name}</div>
             <div className="mt">{result.registration.batch} • {result.registration.reference}</div>
-            <div className="ln">The Grand Wedding awaits you. Enjoy the celebration!</div>
+            <div className="ln">OLAM 3.0 – A Grand Wedding awaits you. Enjoy the celebration!</div>
             {result.checked_in_at ? <div className="mt">Checked in at {fmtTime(result.checked_in_at)}</div> : null}
             <Button className="mt-16" onClick={resume} testId="scanner-continue-btn">Scan next</Button>
           </div>

@@ -1,8 +1,8 @@
 // Gate scanning, attendance log and recent check-ins.
 import { Hono } from "hono";
 import { z } from "zod";
-import { type AppEnv, type User, audit, coordinatorBranch, displayName, requireRoles, secret } from "../lib/ctx";
-import { hashPassToken, newId, nowIso, readBody } from "../lib/util";
+import { type AppEnv, type User, audit, canExport, coordinatorBranch, displayName, requireRoles, secret } from "../lib/ctx";
+import { csvResponse, hashPassToken, newId, nowIso, readBody, toCsv } from "../lib/util";
 import type { Env } from "../lib/util";
 
 const scan = new Hono<AppEnv>();
@@ -75,11 +75,9 @@ scan.post("/scan", requireRoles("super_admin", "coordinator", "scanner"), async 
   return c.json(res);
 });
 
-/** Full check-in log + refused/duplicate attempts, branch-scoped. */
-scan.get("/attendance", requireRoles("super_admin", "coordinator"), async (c) => {
-  const user = c.get("user");
-  const branchId = coordinatorBranch(user) ?? c.req.query("branch_id") ?? "";
-  const db = c.env.DB;
+/** Full check-in log + refused/duplicate attempts, branch-scoped (coordinators: own branch). */
+async function attendanceData(db: D1Database, user: User, requested?: string) {
+  const branchId = coordinatorBranch(user) ?? requested ?? "";
   const checkins = await db
     .prepare(
       `SELECT a.id, a.checked_in_at, a.scanner_name, a.station, r.full_name, r.reference, r.batch, b.name AS branch_name
@@ -92,11 +90,39 @@ scan.get("/attendance", requireRoles("super_admin", "coordinator"), async (c) =>
     .prepare(`SELECT * FROM scan_attempts ${branchId ? "WHERE branch_id = ?" : ""} ORDER BY attempted_at DESC LIMIT 2000`)
     .bind(...(branchId ? [branchId] : []))
     .all<any>();
-  return c.json({
+  return {
     checkins: checkins.results,
     attempts: attempts.results,
     duplicate_count: attempts.results.filter((x) => x.result === "ALREADY_CHECKED_IN").length,
-  });
+  };
+}
+
+scan.get("/attendance", requireRoles("super_admin", "coordinator"), async (c) =>
+  c.json(await attendanceData(c.env.DB, c.get("user"), c.req.query("branch_id"))),
+);
+
+const RESULT_LABEL: Record<string, string> = {
+  ALREADY_CHECKED_IN: "Duplicate", NOT_APPROVED: "Not approved", REVOKED: "Revoked", INVALID: "Invalid QR",
+};
+
+/** ?view=checkins (default) or ?view=attempts (refused / duplicate scans), plus optional ?branch_id. */
+scan.get("/export/attendance.csv", requireRoles("super_admin", "coordinator"), async (c) => {
+  const user = c.get("user");
+  canExport(user);
+  const view = c.req.query("view") === "attempts" ? "attempts" : "checkins";
+  const d = await attendanceData(c.env.DB, user, c.req.query("branch_id"));
+  const csv = view === "checkins"
+    ? toCsv([
+      ["Checked In At", "Reference", "Name", "Branch", "Batch", "Scanned By", "Station"],
+      ...d.checkins.map((r: any) => [r.checked_in_at, r.reference, r.full_name, r.branch_name || "", r.batch, r.scanner_name || "", r.station || ""]),
+    ])
+    : toCsv([
+      ["Attempted At", "Result", "Reference", "Name", "Branch", "Batch", "Scanned By", "Station"],
+      ...d.attempts.map((r: any) => [r.attempted_at, RESULT_LABEL[r.result] ?? r.result, r.reference || "", r.full_name || "", r.branch_name || "", r.batch || "", r.scanner_name || "", r.station || ""]),
+    ]);
+  const rows = view === "checkins" ? d.checkins.length : d.attempts.length;
+  await audit(c.env.DB, user.id, "export.attendance_csv", null, { view, rows });
+  return csvResponse(csv, `olam-attendance-${view}.csv`);
 });
 
 scan.get("/scan/history", requireRoles("super_admin", "coordinator", "scanner"), async (c) => {

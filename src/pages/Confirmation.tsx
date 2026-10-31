@@ -1,6 +1,8 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BgScreen } from "../components/BgScreen";
+import { PushOptIn } from "../components/PushOptIn";
 import { Button } from "../components/ui";
+import { loadMe } from "../lib/pass";
 
 export default function Confirmation() {
   const nav = useNavigate();
@@ -13,8 +15,9 @@ export default function Confirmation() {
         <div className="eyebrow">REGISTRATION RECEIVED</div>
         <h1>Thank you.</h1>
         <p className="sub">
-          Your invitation request is being reviewed by your branch coordinator. Once you're approved, come back to
-          “Retrieve my pass” with this reference and your email to view and download your QR pass as a PDF.
+          Your invitation request is being reviewed by your branch coordinator. This phone remembers you: open this
+          app again and your QR pass appears as soon as you're approved. On another phone, use “Retrieve my pass” with your
+          email and mobile number.
         </p>
         <div className="card mt-24">
           <div className="label-sm">REGISTRATION REFERENCE</div>
@@ -22,13 +25,14 @@ export default function Confirmation() {
           <div className="divider" />
           <div className="label-sm">EMAIL</div>
           <div style={{ marginTop: 4, overflowWrap: "anywhere" }}>{email}</div>
-          <p className="meta mt-12">Keep this reference safe — take a screenshot. You will need it to retrieve your pass.</p>
+          <p className="meta mt-12">Quote this reference if you contact your coordinator.</p>
         </div>
+        <PushOptIn me={loadMe()} />
         <div className="stack mt-24">
-          <Button testId="confirmation-check-status-btn" onClick={() => nav(`/my-pass?ref=${encodeURIComponent(ref)}&email=${encodeURIComponent(email)}`, { replace: true })}>
+          <Button testId="confirmation-check-status-btn" onClick={() => nav("/my-pass", { replace: true })}>
             Check Status / Retrieve Pass
           </Button>
-          <button type="button" className="link-btn" style={{ width: "100%" }} onClick={() => nav("/", { replace: true })} data-testid="confirmation-home-btn">Back to home</button>
+          <button type="button" className="link-btn" style={{ width: "100%" }} onClick={() => nav("/", { replace: true, state: { home: true } })} data-testid="confirmation-home-btn">Back to home</button>
         </div>
       </div>
     </BgScreen>

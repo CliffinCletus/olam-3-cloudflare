@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { type Batch, type Branch, api, post } from "../api";
 import { BgScreen } from "../components/BgScreen";
 import { Button, Check, Field, Spinner } from "../components/ui";
+import { saveMe } from "../lib/pass";
 
 type Settings = { registration_open: boolean; closed_message: string; privacy_notice: string };
 const LABELS: Record<string, string> = { full_name: "Full Name", mobile: "Mobile Number", email: "Email", branch_id: "Branch", batch: "Batch", batch_no: "Batch No.", faculty_name: "Faculty Name" };
@@ -35,6 +36,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       const reg = await post<{ reference: string }>("/registrations", form);
+      saveMe({ email: form.email.trim(), mobile: form.mobile.trim(), reference: reg.reference });
       nav(`/confirmation?ref=${encodeURIComponent(reg.reference)}&email=${encodeURIComponent(form.email.trim())}`, { replace: true });
     } catch (e: any) { setError(e.message); }
     finally { setSubmitting(false); }
@@ -62,7 +64,7 @@ export default function Register() {
             <Field label="Mobile Number" htmlFor="r-mobile" hint="One registration per mobile number">
               <input id="r-mobile" className="input" data-testid="register-mobile-input" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} type="tel" inputMode="tel" placeholder="+91 9876543210" autoComplete="tel" maxLength={20} />
             </Field>
-            <Field label="Email Address" htmlFor="r-email" hint="One registration per email. You'll need it to retrieve your pass.">
+            <Field label="Email Address" htmlFor="r-email" hint="One registration per email. Your email and mobile number retrieve your pass.">
               <input id="r-email" className="input" data-testid="register-email-input" value={form.email} onChange={(e) => set("email", e.target.value)} type="email" inputMode="email" autoCapitalize="none" placeholder="you@example.com" autoComplete="email" />
             </Field>
             <Field label="Branch">

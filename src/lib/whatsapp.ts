@@ -11,7 +11,8 @@ export function openWhatsApp(text: string, number?: string | null) {
   window.open(url, "_blank", "noopener");
 }
 
-export const myPassLink = (ref: string) => `${window.location.origin}/my-pass?ref=${encodeURIComponent(ref)}`;
+/** Students open their pass with their email + mobile (or it opens by itself on the phone they registered with). */
+export const myPassLink = () => `${window.location.origin}/my-pass`;
 
 export const stationName = () => {
   const ua = navigator.userAgent;

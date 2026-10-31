@@ -132,7 +132,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .item-top .name { flex: 1; min-width: 0; white-space: nowrap; }
 .empty { text-align: center; color: var(--muted); padding: 24px 0; }
 .stack > * + * { margin-top: 12px; }
-.mt-8 { margin-top: 8px; } .mt-12 { margin-top: 12px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; }
+.mt-8 { margin-top: 8px; } .mt-12 { margin-top: 12px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; } .mb-12 { margin-bottom: 12px; }
 
 /* --- Landing ------------------------------------------------------------------------- */
 .landing { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -158,10 +158,16 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ticket .qr { display: inline-block; background: #fff; padding: 14px; border-radius: var(--r-md); line-height: 0; }
 .ticket .qr img { width: 220px; height: 220px; max-width: 62vw; max-height: 62vw; image-rendering: pixelated; }
 .ticket .ref { color: var(--gold); font-weight: 700; font-size: 13px; letter-spacing: 3px; margin-top: 12px; }
-.ticket .rows { margin-top: 16px; border-top: 1px solid rgba(212, 175, 55, 0.2); padding-top: 12px; display: grid; gap: 10px; text-align: left; }
-.ticket .r { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.ticket .r span:first-child { color: var(--gold); letter-spacing: 2px; font-size: 10px; font-weight: 700; flex: 0 0 auto; }
-.ticket .r span:last-child { font-size: 14px; font-weight: 500; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* minmax(0, 1fr): rows never grow wider than the ticket; long values (venue, names) wrap. */
+.ticket .rows { margin-top: 16px; border-top: 1px solid rgba(212, 175, 55, 0.2); padding-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; text-align: left; }
+.ticket .r { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; min-width: 0; }
+.ticket .r span:first-child { color: var(--gold); letter-spacing: 2px; font-size: 10px; font-weight: 700; }
+.ticket .r span:last-child { font-size: 14px; font-weight: 500; text-align: right; overflow-wrap: anywhere; line-height: 1.35; }
+.push-card { max-width: 380px; margin: 16px auto 0; background: var(--ivory); color: var(--navy); border: 1px solid var(--gold); border-radius: var(--r-md); padding: 14px 16px; font-size: 13px; line-height: 1.45; text-align: left; }
+.push-card .push-btn { margin-top: 10px; width: 100%; min-height: 44px; border-radius: 999px; border: 0; background: var(--navy); color: var(--ivory); font-size: 14px; font-weight: 600; cursor: pointer; }
+.push-card .push-btn:disabled { opacity: 0.7; }
+.pass-links { max-width: 380px; margin: 12px auto 0; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+.pass-links button { min-height: 44px; background: none; border: 0; color: rgba(255, 255, 255, 0.85); font-size: 13px; text-decoration: underline; cursor: pointer; }
 .ticket .note { opacity: 0.65; font-size: 11px; margin-top: 14px; }
 .pass-actions { max-width: 380px; margin: 20px auto 0; display: grid; gap: 10px; }
 .offline-note { max-width: 380px; margin: 0 auto 12px; background: #fef3c7; color: var(--warning-text); border-radius: var(--r-md); padding: 10px 12px; font-size: 13px; }

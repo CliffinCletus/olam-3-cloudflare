@@ -119,9 +119,14 @@ test("full flow: lookup, approve, pass verify, scan, duplicate, reject revokes",
   const body = regBody();
   const reg = (await call("/registrations", { method: "POST", body })).data;
 
-  const wrongEmail = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference, email: "other@example.com" } });
+  const wrongEmail = await call("/registrations/lookup", { method: "POST", body: { mobile: body.mobile, email: "other@example.com" } });
   assert.equal(wrongEmail.status, 404);
-  const pending = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference.toLowerCase(), email: body.email } });
+  const wrongMobile = await call("/registrations/lookup", { method: "POST", body: { mobile: "9000000001", email: body.email } });
+  assert.equal(wrongMobile.status, 404);
+  const noMobile = await call("/registrations/lookup", { method: "POST", body: { email: body.email } });
+  assert.equal(noMobile.status, 422);
+  // Mobile in any format (+91, spaces) and email in any case
+  const pending = await call("/registrations/lookup", { method: "POST", body: { mobile: `+91 ${body.mobile.slice(0, 5)} ${body.mobile.slice(5)}`, email: body.email.toUpperCase() } });
   assert.equal(pending.status, 200);
   assert.equal(pending.data.registration.status, "pending");
   assert.equal(pending.data.pass_token, null);
@@ -130,7 +135,7 @@ test("full flow: lookup, approve, pass verify, scan, duplicate, reject revokes",
   assert.equal(ap.status, 200);
   assert.equal(ap.data.status, "approved");
 
-  const lk = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference, email: body.email } });
+  const lk = await call("/registrations/lookup", { method: "POST", body: { mobile: body.mobile, email: body.email } });
   const token = lk.data.pass_token;
   assert.ok(token && token.length >= 20);
   assert.ok("event" in lk.data);
@@ -141,7 +146,7 @@ test("full flow: lookup, approve, pass verify, scan, duplicate, reject revokes",
 
   // approve is idempotent: same token
   await call(`/registrations/${reg.id}/approve`, { method: "POST", token: t });
-  const lk2 = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference, email: body.email } });
+  const lk2 = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference.toLowerCase(), email: body.email } });
   assert.equal(lk2.data.pass_token, token);
 
   const s1 = await call("/scan", { method: "POST", token: t, body: { token, station: "gate-1" } });
@@ -169,7 +174,7 @@ test("full flow: lookup, approve, pass verify, scan, duplicate, reject revokes",
 
   // Re-approve issues a NEW token; the old QR stays dead.
   await call(`/registrations/${reg.id}/approve`, { method: "POST", token: t });
-  const lk3 = await call("/registrations/lookup", { method: "POST", body: { reference: reg.reference, email: body.email } });
+  const lk3 = await call("/registrations/lookup", { method: "POST", body: { mobile: body.mobile, email: body.email } });
   assert.notEqual(lk3.data.pass_token, token);
   assert.equal((await call("/scan", { method: "POST", token: t, body: { token } })).data.result, "INVALID");
 });
@@ -314,6 +319,115 @@ test("reports: faculty, event-day, absent and CSV exports", async () => {
     assert.equal(r.status, 200, p);
     assert.match(r.headers.get("content-type"), /text\/csv/);
   }
+});
+
+test("CSV exports follow the list filters; attendance CSV", async () => {
+  const t = await adminToken();
+  const tag = `Filter ${RUN} ${Math.random().toString(36).slice(2, 6)}`;
+  const a = (await call("/registrations", { method: "POST", body: regBody({ faculty_name: tag, branch_id: "br-2" }) })).data;
+  const p = (await call("/registrations", { method: "POST", body: regBody({ faculty_name: tag, branch_id: "br-2" }) })).data;
+  const other = (await call("/registrations", { method: "POST", body: regBody({ faculty_name: tag, branch_id: "br-3" }) })).data;
+  await call(`/registrations/${a.id}/approve`, { method: "POST", token: t });
+  const get = async (path, token = t) => {
+    const r = await fetch(`${BASE}/api${path}`, { headers: { authorization: `Bearer ${token}` } });
+    return { status: r.status, text: await r.text() };
+  };
+
+  const q = encodeURIComponent(tag);
+  const approved = await get(`/export/registrations.csv?status=approved&q=${q}`);
+  assert.equal(approved.status, 200);
+  assert.ok(approved.text.includes(a.reference) && !approved.text.includes(p.reference));
+  const branch = await get(`/export/registrations.csv?branch_id=br-2&q=${q}`);
+  assert.ok(branch.text.includes(a.reference) && branch.text.includes(p.reference) && !branch.text.includes(other.reference));
+  const list = await call(`/registrations?status=pending&branch_id=br-2&q=${q}`, { token: t });
+  assert.deepEqual(list.data.map((r) => r.id), [p.id]);
+  assert.equal((await get("/export/registrations.csv?status=bogus")).status, 422);
+
+  const token = (await call("/registrations/lookup", { method: "POST", body: { reference: a.reference, email: a.email } })).data.pass_token;
+  await call("/scan", { method: "POST", token: t, body: { token, station: "gate-csv" } });
+  await call("/scan", { method: "POST", token: t, body: { token, station: "gate-csv" } });
+  const ins = await get("/export/attendance.csv?branch_id=br-2");
+  assert.equal(ins.status, 200);
+  assert.match(ins.text, /"Checked In At","Reference","Name"/);
+  assert.ok(ins.text.includes(a.reference));
+  const refused = await get("/export/attendance.csv?view=attempts&branch_id=br-2");
+  assert.match(refused.text, /"Attempted At","Result"/);
+  assert.ok(refused.text.includes(`"Duplicate","${a.reference}"`));
+  const elsewhere = await get("/export/attendance.csv?branch_id=br-3");
+  assert.ok(!elsewhere.text.includes(a.reference));
+
+  const coord = await makeStaff("coordinator", { branch_id: "br-3" });
+  assert.equal((await get("/export/attendance.csv", coord.token)).status, 403);
+  await call(`/staff/${coord.user.id}`, { method: "PATCH", token: t, body: { can_export: true } });
+  const own = await get("/export/attendance.csv?branch_id=br-2", coord.token); // branch_id is ignored for coordinators
+  assert.equal(own.status, 200);
+  assert.ok(!own.text.includes(a.reference));
+});
+
+test("super admin can delete registrations (single + bulk); others cannot", async () => {
+  const t = await adminToken();
+  const body = regBody();
+  const one = (await call("/registrations", { method: "POST", body })).data;
+  await call(`/registrations/${one.id}/approve`, { method: "POST", token: t });
+  const token = (await call("/registrations/lookup", { method: "POST", body: { mobile: body.mobile, email: body.email } })).data.pass_token;
+  await call("/scan", { method: "POST", token: t, body: { token } });
+  await call("/scan", { method: "POST", token: t, body: { token } }); // duplicate -> refused-scan row
+
+  const coord = await makeStaff("coordinator", { branch_id: "br-1" });
+  assert.equal((await call(`/registrations/${one.id}`, { method: "DELETE", token: coord.token })).status, 403);
+  assert.equal((await call("/registrations/bulk-delete", { method: "POST", token: coord.token, body: { ids: [one.id] } })).status, 403);
+
+  const d = await call(`/registrations/${one.id}`, { method: "DELETE", token: t });
+  assert.equal(d.status, 200, JSON.stringify(d.data));
+  assert.equal((await call(`/registrations/${one.id}`, { token: t })).status, 404);
+  assert.equal((await call(`/registrations/${one.id}`, { method: "DELETE", token: t })).status, 404);
+  assert.equal((await call("/pass/verify", { method: "POST", body: { token } })).status, 404);
+  assert.equal((await call("/scan", { method: "POST", token: t, body: { token } })).data.result, "INVALID");
+  const att = await call("/attendance", { token: t });
+  assert.ok(!att.data.checkins.some((c) => c.reference === one.reference));
+  assert.ok(!att.data.attempts.some((c) => c.reference === one.reference));
+  // The same email + mobile can register again
+  assert.equal((await call("/registrations", { method: "POST", body })).status, 200);
+
+  const two = [(await call("/registrations", { method: "POST", body: regBody() })).data, (await call("/registrations", { method: "POST", body: regBody() })).data];
+  const bulk = await call("/registrations/bulk-delete", { method: "POST", token: t, body: { ids: [...two.map((r) => r.id), "reg-missing"] } });
+  assert.equal(bulk.data.deleted, 2);
+  for (const r of two) assert.equal((await call(`/registrations/${r.id}`, { token: t })).status, 404);
+  assert.equal((await call("/registrations/bulk-delete", { method: "POST", token: t, body: { ids: [] } })).status, 422);
+});
+
+test("push reminders: subscribe validation, linking, audience counts, send", async () => {
+  const t = await adminToken();
+  const key = await call("/push/public-key");
+  assert.equal(key.status, 200, "VAPID keys must be in .dev.vars (npm run vapid -- --print)");
+  const b64 = (n) => Buffer.from(Array.from({ length: n }, () => Math.floor(Math.random() * 256))).toString("base64url");
+  const sub = (endpoint) => ({ endpoint, keys: { p256dh: b64(65), auth: b64(16) } });
+
+  assert.equal((await call("/push/subscribe", { method: "POST", body: { subscription: sub("https://evil.example.com/push/1") } })).status, 422);
+  assert.equal((await call("/push/subscribe", { method: "POST", body: { subscription: sub("http://fcm.googleapis.com/fcm/send/x") } })).status, 422);
+
+  const body = regBody({ branch_id: "br-3" });
+  const reg = (await call("/registrations", { method: "POST", body })).data;
+  const endpoint = `https://fcm.googleapis.com/fcm/send/test-${RUN}-${Math.random().toString(36).slice(2)}`;
+  assert.equal((await call("/push/subscribe", { method: "POST", body: { subscription: sub(endpoint) } })).data.linked, false);
+  assert.equal((await call("/push/subscribe", { method: "POST", body: { subscription: sub(endpoint), email: body.email, mobile: "9000000002" } })).data.linked, false);
+  assert.equal((await call("/push/subscribe", { method: "POST", body: { subscription: sub(endpoint), email: body.email, mobile: body.mobile } })).data.linked, true);
+
+  const before = (await call("/push/stats?branch_id=br-3", { token: t })).data;
+  assert.ok(before.pending >= 1 && before.registered >= before.pending);
+  const coord = await makeStaff("coordinator", { branch_id: "br-3" });
+  assert.equal((await call("/push/stats", { token: coord.token })).status, 403);
+  assert.equal((await call("/push/send", { method: "POST", token: coord.token, body: { title: "Hi", body: "There", audience: "all" } })).status, 403);
+  assert.equal((await call("/push/send", { method: "POST", token: t, body: { title: "", body: "x", audience: "all" } })).status, 422);
+  // A branch with no devices: nothing is sent, no paging
+  const none = await call("/push/send", { method: "POST", token: t, body: { title: "Hello", body: "Nobody here", audience: "approved", branch_id: "br-none" } });
+  assert.deepEqual(none.data, { sent: 0, failed: 0, removed: 0, next: null });
+
+  // Deleting the registration removes its devices too
+  await call(`/registrations/${reg.id}`, { method: "DELETE", token: t });
+  const after = (await call("/push/stats?branch_id=br-3", { token: t })).data;
+  assert.equal(after.pending, before.pending - 1);
+  assert.equal((await call("/push/unsubscribe", { method: "POST", body: { endpoint } })).status, 200);
 });
 
 test("CSV injection is neutralised", async () => {

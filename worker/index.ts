@@ -5,6 +5,7 @@ import type { AppEnv } from "./lib/ctx";
 import { ApiError } from "./lib/util";
 import admin from "./routes/admin";
 import auth from "./routes/auth";
+import push from "./routes/push";
 import registrations from "./routes/registrations";
 import reports from "./routes/reports";
 import scan from "./routes/scan";
@@ -24,6 +25,7 @@ app.route("/", admin);
 app.route("/", registrations);
 app.route("/", scan);
 app.route("/", reports);
+app.route("/", push);
 
 app.notFound((c) => c.json({ detail: "Not found" }, 404));
 

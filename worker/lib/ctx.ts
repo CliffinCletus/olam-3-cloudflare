@@ -126,6 +126,26 @@ export async function getRegistration(db: D1Database, where: "id" | "reference",
   return db.prepare(`${REG_SELECT} WHERE r.${where} = ?`).bind(value).first<any>();
 }
 
+/** WHERE clause for the registrations list and its CSV export: branch (forced for coordinators), status, free-text search. */
+export function registrationFilter(user: User, q: { branch_id?: string; status?: string; q?: string }) {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  const branchId = coordinatorBranch(user) ?? q.branch_id;
+  if (branchId) { where.push("r.branch_id = ?"); params.push(branchId); }
+  if (q.status) {
+    if (!["pending", "approved", "rejected"].includes(q.status)) fail(422, "Invalid status filter");
+    where.push("r.status = ?"); params.push(q.status);
+  }
+  const text = (q.q || "").trim();
+  if (text) {
+    const like = `%${text.replace(/[\\%_]/g, (m) => "\\" + m)}%`;
+    const fields = ["full_name", "faculty_name", "batch_no", "mobile", "email", "reference", "batch"];
+    where.push(`(${fields.map((f) => `r.${f} LIKE ? ESCAPE '\\'`).join(" OR ")})`);
+    for (let i = 0; i < fields.length; i++) params.push(like);
+  }
+  return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
+}
+
 /** Coordinators are always scoped to their own branch. */
 export function coordinatorBranch(user: User): string | null {
   if (user.role !== "coordinator") return null;

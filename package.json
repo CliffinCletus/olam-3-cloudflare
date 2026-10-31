@@ -12,6 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply olam3-db --local",
     "db:migrate": "wrangler d1 migrations apply olam3-db --remote",
     "secrets": "node scripts/set-secrets.mjs",
+    "vapid": "node scripts/set-vapid.mjs",
     "deploy": "vite build && wrangler deploy",
     "test:api": "node --test tests/api.test.mjs"
   },

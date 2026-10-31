@@ -11,7 +11,7 @@ export default defineConfig({
       includeAssets: ["favicon.png", "apple-touch-icon.png", "images/olam-bg.jpg", "fonts/*.woff2", "sounds/*.wav"],
       manifest: {
         id: "/",
-        name: "OLAM 3.0 – The Grand Wedding",
+        name: "OLAM 3.0 – A Grand Wedding",
         short_name: "OLAM 3.0",
         description: "Register, get your entry pass and check in for OLAM 3.0 by Delta Academy.",
         start_url: "/",
@@ -27,6 +27,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ["/push-sw.js"], // push reminders + notification taps
         globPatterns: ["**/*.{js,css,html,png,jpg,woff2,wav,svg}"],
         // jsPDF's optional html()/svg() helpers — never used, so don't make phones download them.
         globIgnores: ["**/html2canvas*.js", "**/purify.es*.js", "**/index.es*.js"],

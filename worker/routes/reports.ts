@@ -1,6 +1,6 @@
 // Dashboard stats, faculty / event-day / absent reports and CSV exports.
 import { Hono } from "hono";
-import { type AppEnv, type User, audit, canExport, coordinatorBranch, requireRoles } from "../lib/ctx";
+import { type AppEnv, type User, audit, canExport, coordinatorBranch, registrationFilter, requireRoles } from "../lib/ctx";
 import { csvResponse, toCsv } from "../lib/util";
 
 const reports = new Hono<AppEnv>();
@@ -207,18 +207,16 @@ reports.get("/export/absent.csv", reviewer, async (c) => {
   return csvResponse(csv, "olam-absent-students.csv");
 });
 
-// --- Full registrations export ----------------------------------------------------------------
+// --- Registrations export (same filters as the list: ?status, ?branch_id, ?q) --------------------
 reports.get("/export/registrations.csv", reviewer, async (c) => {
   const user = c.get("user");
   canExport(user);
-  const own = coordinatorBranch(user);
+  const f = registrationFilter(user, { branch_id: c.req.query("branch_id"), status: c.req.query("status"), q: c.req.query("q") });
   const { results } = await c.env.DB
-    .prepare(
-      `SELECT r.*, b.name AS branch_name, a.checked_in_at FROM registrations r
+    .prepare(`SELECT r.*, b.name AS branch_name, a.checked_in_at FROM registrations r
        LEFT JOIN branches b ON b.id = r.branch_id LEFT JOIN attendance a ON a.registration_id = r.id
-       ${own ? "WHERE r.branch_id = ?" : ""} ORDER BY r.created_at`,
-    )
-    .bind(...(own ? [own] : []))
+       ${f.sql} ORDER BY r.created_at`)
+    .bind(...f.params)
     .all<any>();
   const csv = toCsv([
     ["Reference", "Name", "Mobile", "Email", "Branch", "Batch", "Batch No.", "Faculty Name", "Status", "Reviewed By", "Checked In At", "Created At"],
@@ -227,7 +225,7 @@ reports.get("/export/registrations.csv", reviewer, async (c) => {
       d.reviewed_by_name || "", d.checked_in_at || "", d.created_at,
     ]),
   ]);
-  await audit(c.env.DB, user.id, "export.csv", null, { rows: results.length });
+  await audit(c.env.DB, user.id, "export.csv", null, { rows: results.length, status: c.req.query("status") || "all" });
   return csvResponse(csv, "olam-registrations.csv");
 });
 

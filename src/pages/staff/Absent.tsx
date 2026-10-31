@@ -33,7 +33,7 @@ export default function Absent() {
     const num = waNumber(s.mobile);
     if (!num) { setMsg(`${s.full_name}'s mobile number looks incomplete — please call instead.`); return; }
     openWhatsApp(
-      `Hi ${s.full_name}, this is your OLAM 3.0 coordinator (${branch}). 🎉\n\nThe Grand Wedding has started and we haven't seen you at the entrance yet. Please come soon and keep your QR pass ready at the gate.\n\nReference: ${s.reference}\nOpen your pass: ${myPassLink(s.reference)}`,
+      `Hi ${s.full_name}, this is your OLAM 3.0 coordinator (${branch}). 🎉\n\nOLAM 3.0 – A Grand Wedding has started and we haven't seen you at the entrance yet. Please come soon and keep your QR pass ready at the gate.\n\nReference: ${s.reference}\nOpen your pass (email + mobile number): ${myPassLink()}`,
       num,
     );
   }

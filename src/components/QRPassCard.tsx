@@ -10,7 +10,7 @@ export function QRPassCard({ token, name, reference, branch, batch, eventDate, v
     <div className="ticket" data-testid="qr-pass-card">
       <div className="ey">DELTA ACADEMY PRESENTS</div>
       <div className="ev">OLAM 3.0</div>
-      <div className="tg">THE GRAND WEDDING</div>
+      <div className="tg">A GRAND WEDDING</div>
       <div className="perf" />
       <div className="qr">{src ? <img src={src} alt={`QR entry pass ${reference}`} data-testid="qr-image" /> : <div style={{ width: 220, height: 220 }} />}</div>
       <div className="ref">{reference}</div>
