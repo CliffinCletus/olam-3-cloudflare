@@ -19,6 +19,7 @@
   "dependencies": {
     "hono": "^4.13.14",
     "jspdf": "^4.2.1",
+    "lucide-react": "^1.54.0",
     "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",

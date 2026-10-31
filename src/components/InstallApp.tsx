@@ -1,3 +1,4 @@
+import { Share, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { isIOS, isStandalone } from "../lib/device";
 
@@ -37,6 +38,7 @@ export function InstallApp() {
     <div className="install">
       <button
         type="button"
+        className="install-btn"
         data-testid="install-app-btn"
         onClick={async () => {
           if (deferred) {
@@ -47,11 +49,11 @@ export function InstallApp() {
           } else setHelp((v) => !v);
         }}
       >
-        📲 Add OLAM 3.0 to your home screen
+        <Smartphone />Add OLAM 3.0 to your home screen
       </button>
       {help ? (
         <p className="help" data-testid="install-ios-help">
-          In Safari, tap the Share button (square with an arrow), then choose “Add to Home Screen”.
+          In Safari, tap the Share button <Share style={{ width: 14, height: 14, verticalAlign: -2 }} aria-label="Share" />, then choose “Add to Home Screen”.
         </p>
       ) : null}
     </div>

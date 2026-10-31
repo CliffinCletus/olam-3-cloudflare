@@ -1,7 +1,8 @@
+import { Download, GraduationCap, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api, downloadCsv } from "../../api";
-import { BranchFilter, PageHead, canExportCsv, useBranches, useStaff } from "../../components/Staff";
-import { Button, Spinner } from "../../components/ui";
+import { BranchFilter, StaffShell, canExportCsv, useBranches, useStaff } from "../../components/Staff";
+import { Alert, Button, EmptyState, Pill, Spinner, StatCard } from "../../components/ui";
 
 type Row = { branch_id: string; branch_name: string; faculty_name: string; total: number; approved: number; pending: number; rejected: number; checked_in: number };
 type Data = { rows: Row[]; total_students: number; faculty_count: number };
@@ -26,41 +27,43 @@ export default function FacultyReport() {
   (data?.rows ?? []).forEach((r) => { (groups[r.branch_name] ||= []).push(r); });
 
   return (
-    <div className="staff-shell">
-      <PageHead eyebrow="REPORTS" title="Faculty report" sub="How many students each faculty member brought, branch by branch.">
-        <BranchFilter user={user} branches={branches} value={branchId} onChange={(id) => { setBranchId(id); load(id); }} testPrefix="faculty-branch" />
-      </PageHead>
-      <main className="staff-body">
-        {loading && !data ? <Spinner /> : null}
-        {data ? (
-          <>
-            <div className="summary-boxes">
-              <div className="sum-box"><div className="v" data-testid="faculty-count">{data.faculty_count}</div><div className="l">FACULTY</div></div>
-              <div className="sum-box"><div className="v" data-testid="faculty-students-total">{data.total_students}</div><div className="l">STUDENTS</div></div>
-            </div>
-            {canExportCsv(user) ? (
-              <Button variant="navy" className="mt-12" testId="faculty-export-btn" onClick={async () => setMsg(await downloadCsv(`/export/faculty.csv${branchId ? `?branch_id=${branchId}` : ""}`, "olam-faculty-report.csv"))}>Download faculty CSV</Button>
-            ) : (
-              <p className="meta mt-12" data-testid="faculty-export-disabled">CSV download is not enabled for your account. Ask the admin if you need it.</p>
-            )}
-            {msg ? <p className="err" data-testid="faculty-msg">{msg}</p> : null}
-            {data.rows.length === 0 ? <p className="empty">No registrations with a faculty name yet.</p> : null}
-            {Object.entries(groups).map(([bname, rows]) => (
-              <section key={bname}>
-                <div className="branch-title">{bname}</div>
+    <StaffShell user={user} title="Faculty report" sub="How many students each faculty member brought, branch by branch."
+      actions={canExportCsv(user) ? <Button variant="secondary" small block={false} icon={<Download />} testId="faculty-export-btn" onClick={async () => setMsg(await downloadCsv(`/export/faculty.csv${branchId ? `?branch_id=${branchId}` : ""}`, "olam-faculty-report.csv"))}>Export CSV</Button> : undefined}>
+      <div className="toolbar"><BranchFilter user={user} branches={branches} value={branchId} onChange={(id) => { setBranchId(id); load(id); }} testPrefix="faculty-branch" /></div>
+      {loading && !data ? <Spinner /> : null}
+      {msg ? <div className="mb-12"><Alert tone="error" testId="faculty-msg">{msg}</Alert></div> : null}
+      {!canExportCsv(user) ? <p className="meta mb-12" data-testid="faculty-export-disabled">CSV download is not enabled for your account. Ask the admin if you need it.</p> : null}
+      {data ? (
+        <>
+          <div className="summary-boxes">
+            <StatCard label="Faculty" value={<span data-testid="faculty-count">{data.faculty_count}</span>} icon={<GraduationCap />} tone="gold" />
+            <StatCard label="Students" value={<span data-testid="faculty-students-total">{data.total_students}</span>} icon={<Users />} tone="crimson" />
+          </div>
+          {data.rows.length === 0 ? <EmptyState icon={<GraduationCap />} title="No faculty names yet">They appear as students register.</EmptyState> : null}
+          {Object.entries(groups).map(([bname, rows]) => (
+            <section key={bname}>
+              <div className="group-title">{bname}<span className="count">{rows.length} faculty</span></div>
+              <div className="list">
                 {rows.map((r) => (
-                  <div className="card" key={`${r.branch_id}-${r.faculty_name}`}>
-                    <div className="item-top"><span className="name">{r.faculty_name}</span><span style={{ fontFamily: "var(--display)", fontWeight: 700, fontSize: 22, color: "var(--gold-text)" }}>{r.total}</span></div>
-                    <p className="meta">
-                      <span style={{ color: "var(--success-text)" }}>{r.approved} approved</span> • <span style={{ color: "var(--warning-text)" }}>{r.pending} pending</span> • <span style={{ color: "var(--error-text)" }}>{r.rejected} rejected</span> • {r.checked_in} checked in
-                    </p>
+                  <div className="list-item" key={`${r.branch_id}-${r.faculty_name}`}>
+                    <span className="lead-ico" style={{ background: "var(--gold-100)", color: "var(--gold-700)" }}><GraduationCap /></span>
+                    <div className="main">
+                      <div className="name">{r.faculty_name}</div>
+                      <div className="row wrap mt-4" style={{ gap: 6 }}>
+                        <Pill label={`${r.approved} approved`} tone="success" />
+                        {r.pending ? <Pill label={`${r.pending} pending`} tone="warning" /> : null}
+                        {r.rejected ? <Pill label={`${r.rejected} rejected`} tone="error" /> : null}
+                        <Pill label={`${r.checked_in} in`} tone="info" />
+                      </div>
+                    </div>
+                    <div className="big-num" style={{ fontSize: 30 }}>{r.total}</div>
                   </div>
                 ))}
-              </section>
-            ))}
-          </>
-        ) : msg ? <p className="err">{msg}</p> : null}
-      </main>
-    </div>
+              </div>
+            </section>
+          ))}
+        </>
+      ) : null}
+    </StaffShell>
   );
 }

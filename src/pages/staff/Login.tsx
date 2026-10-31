@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { KeyRound, LogIn, Mail, ScanLine, ShieldCheck, Users } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { type Branch, type Role, api, getUser, login } from "../../api";
-import { BgScreen } from "../../components/BgScreen";
-import { Button, Field } from "../../components/ui";
+import { StudentScreen } from "../../components/StudentScreen";
+import { Alert, Button, Chips, Field, WithIcon } from "../../components/ui";
 
-const ROLES: { key: Role; label: string; hint: string }[] = [
-  { key: "coordinator", label: "Branch Coordinator", hint: "Approve students of your own branch" },
-  { key: "scanner", label: "Gate Scanner", hint: "Scan passes at the entrance" },
-  { key: "super_admin", label: "Admin", hint: "Full access to all branches" },
+const ROLES: { key: Role; label: string; hint: string; icon: ReactNode }[] = [
+  { key: "coordinator", label: "Branch Coordinator", hint: "Approve students of your own branch", icon: <Users /> },
+  { key: "scanner", label: "Gate Scanner", hint: "Scan passes at the entrance", icon: <ScanLine /> },
+  { key: "super_admin", label: "Admin", hint: "Full access to all branches", icon: <ShieldCheck /> },
 ];
 
 export const homeFor = (role: Role) => (role === "scanner" ? "/staff/scanner" : "/staff/dashboard");
@@ -42,49 +43,46 @@ export default function Login() {
   }
 
   return (
-    <BgScreen center>
-      <div className="panel">
-        <button type="button" className="back" onClick={() => nav("/")} data-testid="login-home-btn">← Home</button>
-        <div className="eyebrow mt-8">DELTA ACADEMY STAFF</div>
-        <h1>Sign in</h1>
-        <p className="sub">Choose your role. Coordinators can only approve students of their own branch.</p>
-        <form className="mt-24" onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
+    <StudentScreen back backLabel="Home">
+      <div className="sheet">
+        <div className="sheet-head">
+          <div className="eyebrow">Delta Academy staff</div>
+          <h1>Sign in</h1>
+          <p className="sub">Choose your role, then sign in with the account the admin gave you.</p>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
           <div className="field">
             <span className="field-label">Sign in as</span>
-            <div className="stack" style={{ display: "grid", gap: 8 }}>
+            <div className="role-grid" role="radiogroup">
               {ROLES.map((r) => (
-                <button type="button" key={r.key} onClick={() => { setRole(r.key); setErr(null); }} data-testid={`login-role-${r.key}`}
-                  className="card" style={{ display: "flex", gap: 12, alignItems: "center", textAlign: "left", cursor: "pointer", marginTop: 0, borderColor: role === r.key ? "var(--gold)" : undefined, background: role === r.key ? "#fffaf0" : undefined }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 11, border: "2px solid var(--gold)", display: "grid", placeItems: "center", flex: "0 0 22px" }}>
-                    {role === r.key ? <span style={{ width: 10, height: 10, borderRadius: 5, background: "var(--gold)" }} /> : null}
-                  </span>
-                  <span>
-                    <span className="name" style={{ display: "block" }}>{r.label}</span>
-                    <span className="meta">{r.hint}</span>
-                  </span>
+                <button type="button" role="radio" aria-checked={role === r.key} key={r.key} className={`role-opt ${role === r.key ? "on" : ""}`}
+                  onClick={() => { setRole(r.key); setErr(null); }} data-testid={`login-role-${r.key}`}>
+                  <span className="ico">{r.icon}</span>
+                  <span><b>{r.label}</b><span className="d">{r.hint}</span></span>
+                  <span className="radio" />
                 </button>
               ))}
             </div>
           </div>
           {role === "coordinator" ? (
             <Field label="Your branch">
-              <div className="chips">
-                {branches.map((b) => (
-                  <button type="button" key={b.id} className={`chip ${branchId === b.id ? "on" : ""}`} onClick={() => { setBranchId(b.id); setErr(null); }} data-testid={`login-branch-${b.id}`}>{b.name}</button>
-                ))}
-              </div>
+              <Chips options={branches.map((b) => ({ id: b.id, name: b.name }))} value={branchId} onChange={(v) => { setBranchId(v); setErr(null); }} testPrefix="login-branch" />
             </Field>
           ) : null}
           <Field label="Email" htmlFor="l-email">
-            <input id="l-email" className="input" data-testid="login-email-input" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="none" autoComplete="username" placeholder="you@olam.delta" />
+            <WithIcon icon={<Mail />}>
+              <input id="l-email" className="input" data-testid="login-email-input" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="none" autoComplete="username" placeholder="you@deltaacademy.in" />
+            </WithIcon>
           </Field>
           <Field label="Password" htmlFor="l-pw">
-            <input id="l-pw" className="input" data-testid="login-password-input" value={pw} onChange={(e) => setPw(e.target.value)} type="password" autoComplete="current-password" placeholder="Your password" />
+            <WithIcon icon={<KeyRound />}>
+              <input id="l-pw" className="input" data-testid="login-password-input" value={pw} onChange={(e) => setPw(e.target.value)} type="password" autoComplete="current-password" placeholder="Your password" />
+            </WithIcon>
           </Field>
-          {err ? <p className="err" data-testid="login-error" role="alert" style={{ marginBottom: 12 }}>{err}</p> : null}
-          <Button type="submit" testId="login-submit-btn" loading={busy}>Sign in</Button>
+          {err ? <Alert tone="error" testId="login-error">{err}</Alert> : null}
+          <Button large type="submit" className="mt-16" icon={<LogIn />} testId="login-submit-btn" loading={busy}>Sign in</Button>
         </form>
       </div>
-    </BgScreen>
+    </StudentScreen>
   );
 }

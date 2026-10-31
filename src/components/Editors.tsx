@@ -1,6 +1,7 @@
+import { ArrowDown, ArrowUp, Check, Pencil, Plus, Power, PowerOff, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { type Batch, type Branch, del, patch, post, put } from "../api";
-import { Button, Modal } from "./ui";
+import { Alert, Button, IconButton, Modal, Pill } from "./ui";
 
 export function BranchRow({ branch, onSaved }: { branch: Branch; onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
@@ -18,24 +19,23 @@ export function BranchRow({ branch, onSaved }: { branch: Branch; onSaved: () => 
   return (
     <div className="edit-row" data-testid={`branch-row-${branch.id}`}>
       {editing ? (
-        <form className="line" onSubmit={(e) => { e.preventDefault(); if (name.trim()) save({ name: name.trim(), active: branch.active }); }}>
+        <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) save({ name: name.trim(), active: branch.active }); }}>
           <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} data-testid={`branch-name-input-${branch.id}`} aria-label="Branch name" />
-          <Button small type="submit" loading={busy} testId={`branch-save-btn-${branch.id}`}>Save</Button>
-          <button type="button" className="chip-btn" onClick={() => { setEditing(false); setErr(null); setName(branch.name); }} data-testid={`branch-cancel-btn-${branch.id}`}>Cancel</button>
+          <Button small block={false} type="submit" icon={<Check />} loading={busy} testId={`branch-save-btn-${branch.id}`}>Save</Button>
+          <IconButton small label="Cancel" icon={<X />} onClick={() => { setEditing(false); setErr(null); setName(branch.name); }} testId={`branch-cancel-btn-${branch.id}`} />
         </form>
       ) : (
-        <div className="line">
+        <>
           <div className="grow">
-            <div className="name" style={{ color: branch.active ? undefined : "var(--muted)" }}>{branch.name}</div>
-            <div className="small" style={{ color: branch.active ? "var(--success-text)" : "var(--error-text)" }}>{branch.active ? "Open for registration" : "Switched off — hidden from form"}</div>
+            <div className="name" style={{ color: branch.active ? undefined : "var(--text-2)" }}>{branch.name}</div>
+            <div className="mt-4"><Pill label={branch.active ? "Open for registration" : "Switched off"} tone={branch.active ? "success" : "muted"} /></div>
           </div>
-          <button type="button" className="chip-btn" onClick={() => { setName(branch.name); setEditing(true); }} data-testid={`branch-edit-btn-${branch.id}`}>Rename</button>
-          <button type="button" className={`chip-btn ${branch.active ? "danger" : "success"}`} disabled={busy} onClick={() => save({ name: branch.name, active: !branch.active })} data-testid={`branch-toggle-btn-${branch.id}`}>
-            {branch.active ? "Switch off" : "Switch on"}
-          </button>
-        </div>
+          <IconButton small label={`Rename ${branch.name}`} icon={<Pencil />} onClick={() => { setName(branch.name); setEditing(true); }} testId={`branch-edit-btn-${branch.id}`} />
+          <IconButton small variant={branch.active ? "danger" : "success"} label={branch.active ? `Switch off ${branch.name}` : `Switch on ${branch.name}`} icon={branch.active ? <PowerOff /> : <Power />}
+            loading={busy} onClick={() => save({ name: branch.name, active: !branch.active })} testId={`branch-toggle-btn-${branch.id}`} />
+        </>
       )}
-      {err ? <p className="err">{err}</p> : null}
+      {err ? <div style={{ width: "100%" }}><Alert tone="error">{err}</Alert></div> : null}
     </div>
   );
 }
@@ -75,50 +75,53 @@ export function BatchEditor({ batches, onChanged }: { batches: Batch[]; onChange
 
   return (
     <div data-testid="batch-editor">
-      {batches.length === 0 ? <p className="empty">No batches yet — add one below.</p> : null}
-      {batches.map((b, i) => (
-        <div className="edit-row" key={b.id} data-testid={`batch-row-${b.id}`}>
-          {editId === b.id ? (
-            <form className="line" onSubmit={(e) => { e.preventDefault(); rename(b); }}>
-              <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} aria-label="Batch name" data-testid={`batch-name-input-${b.id}`} />
-              <Button small type="submit" loading={busy} testId={`batch-save-btn-${b.id}`}>Save</Button>
-              <button type="button" className="chip-btn" onClick={() => { setEditId(null); setErr(null); }}>Cancel</button>
-            </form>
-          ) : (
-            <div className="line">
-              <div className="grow">
-                <div className="name" data-testid={`batch-name-${b.id}`}>{b.name}</div>
-                <div className="small muted">{b.registrations ? `${b.registrations} registration${b.registrations === 1 ? "" : "s"}` : "No registrations yet"}</div>
-              </div>
-              <button type="button" className="icon-btn" aria-label={`Move ${b.name} up`} disabled={busy || i === 0} onClick={() => move(i, -1)} data-testid={`batch-up-btn-${b.id}`}>↑</button>
-              <button type="button" className="icon-btn" aria-label={`Move ${b.name} down`} disabled={busy || i === batches.length - 1} onClick={() => move(i, 1)} data-testid={`batch-down-btn-${b.id}`}>↓</button>
-              <button type="button" className="chip-btn" onClick={() => { setEditId(b.id); setName(b.name); setErr(null); }} data-testid={`batch-edit-btn-${b.id}`}>Rename</button>
-              <button type="button" className="chip-btn danger" onClick={() => setConfirmDel(b)} data-testid={`batch-delete-btn-${b.id}`}>Delete</button>
-            </div>
-          )}
-        </div>
-      ))}
-      <form className="row mt-12" onSubmit={(e) => {
-        e.preventDefault();
-        const n = newName.trim();
-        if (!n) return;
-        run(() => post("/batches", { name: n }), `Added “${n}”.`).then((ok) => ok && setNewName(""));
-      }}>
-        <input className="input grow" placeholder="New batch name" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} data-testid="new-batch-input" aria-label="New batch name" />
-        <Button small type="submit" loading={busy && !editId} testId="add-batch-btn" className="btn-auto">Add</Button>
-      </form>
-      {err ? <p className="err" data-testid="batch-error">{err}</p> : null}
-      {note ? <p className="ok" data-testid="batch-note">{note}</p> : null}
+      <div className="list">
+        {batches.length === 0 ? <p className="empty">No batches yet — add one below.</p> : null}
+        {batches.map((b, i) => (
+          <div className="edit-row" key={b.id} data-testid={`batch-row-${b.id}`}>
+            {editId === b.id ? (
+              <form onSubmit={(e) => { e.preventDefault(); rename(b); }}>
+                <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} aria-label="Batch name" data-testid={`batch-name-input-${b.id}`} />
+                <Button small block={false} type="submit" icon={<Check />} loading={busy} testId={`batch-save-btn-${b.id}`}>Save</Button>
+                <IconButton small label="Cancel" icon={<X />} onClick={() => { setEditId(null); setErr(null); }} />
+              </form>
+            ) : (
+              <>
+                <div className="grow">
+                  <div className="name" data-testid={`batch-name-${b.id}`}>{b.name}</div>
+                  <div className="small muted">{b.registrations ? `${b.registrations} registration${b.registrations === 1 ? "" : "s"}` : "No registrations yet"}</div>
+                </div>
+                <IconButton small variant="ghost" label={`Move ${b.name} up`} icon={<ArrowUp />} disabled={busy || i === 0} onClick={() => move(i, -1)} testId={`batch-up-btn-${b.id}`} />
+                <IconButton small variant="ghost" label={`Move ${b.name} down`} icon={<ArrowDown />} disabled={busy || i === batches.length - 1} onClick={() => move(i, 1)} testId={`batch-down-btn-${b.id}`} />
+                <IconButton small label={`Rename ${b.name}`} icon={<Pencil />} onClick={() => { setEditId(b.id); setName(b.name); setErr(null); }} testId={`batch-edit-btn-${b.id}`} />
+                <IconButton small variant="danger" label={`Delete ${b.name}`} icon={<Trash2 />} onClick={() => setConfirmDel(b)} testId={`batch-delete-btn-${b.id}`} />
+              </>
+            )}
+          </div>
+        ))}
+        <form className="add-row" onSubmit={(e) => {
+          e.preventDefault();
+          const n = newName.trim();
+          if (!n) return;
+          run(() => post("/batches", { name: n }), `Added “${n}”.`).then((ok) => ok && setNewName(""));
+        }}>
+          <input className="input" style={{ flex: 1, minWidth: 0 }} placeholder="New batch name" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} data-testid="new-batch-input" aria-label="New batch name" />
+          <Button small block={false} type="submit" icon={<Plus />} loading={busy && !editId} testId="add-batch-btn">Add</Button>
+        </form>
+      </div>
+      {err ? <Alert tone="error" testId="batch-error">{err}</Alert> : null}
+      {note ? <Alert tone="success" testId="batch-note">{note}</Alert> : null}
 
       <Modal open={!!confirmDel} onClose={() => setConfirmDel(null)}>
+        <div className="modal-ico"><Trash2 /></div>
         <h2>Delete batch “{confirmDel?.name}”?</h2>
         <p className="sub">
           It disappears from the registration form.{" "}
           {confirmDel?.registrations ? `${confirmDel.registrations} existing registration${confirmDel.registrations === 1 ? "" : "s"} keep “${confirmDel.name}” as their batch.` : "No one has registered with it yet."}
         </p>
-        <div className="row mt-16">
-          <Button variant="ghost" onClick={() => setConfirmDel(null)} testId="batch-delete-cancel">Cancel</Button>
-          <Button variant="danger" loading={busy} testId="batch-delete-confirm" onClick={async () => {
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={() => setConfirmDel(null)} testId="batch-delete-cancel">Cancel</Button>
+          <Button variant="danger" icon={<Trash2 />} loading={busy} testId="batch-delete-confirm" onClick={async () => {
             const b = confirmDel!;
             await run(() => del(`/batches/${b.id}`), `Deleted “${b.name}”.`);
             setConfirmDel(null);

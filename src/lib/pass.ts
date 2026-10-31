@@ -67,7 +67,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 export async function qrDataUrl(token: string, size = 440): Promise<string> {
   const cv = document.createElement("canvas");
-  await QRCode.toCanvas(cv, token, { errorCorrectionLevel: "H", margin: 1, width: size, color: { dark: "#0B192C", light: "#FFFFFF" } });
+  await QRCode.toCanvas(cv, token, { errorCorrectionLevel: "H", margin: 1, width: size, color: { dark: "#2E0709", light: "#FFFFFF" } });
   const img = await logo();
   if (img) {
     const ctx = cv.getContext("2d")!;

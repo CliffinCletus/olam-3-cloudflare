@@ -22,6 +22,10 @@ Hono API under `/api/*` (`run_worker_first: ["/api/*"]`, SPA fallback for everyt
   (free-plan subrequest limit) and pages with `after`. Endpoints are restricted to known push services (`isPushEndpoint`).
 - Event name is "OLAM 3.0 – A Grand Wedding" (never "The Grand Wedding").
 - Batches are referenced by **name** in `registrations.batch`; renaming a batch updates registrations in the same D1 batch.
-- Frontend: plain CSS in `src/styles.css` (navy `#0B192C`, gold `#D4AF37`, ivory `#FDFBF7`; Playfair Display + Inter), mobile-first, 44px touch targets,
+- Frontend: plain CSS in `src/styles.css` with design tokens on `:root`. Palette = logo colours only (crimson `#C1222A` + its
+  shades for dark text, blush `#EB7A83`, olive `#565929` / yellow-green `#C3BC42`) + gold + white, royal blue `#2447A8` as a quiet
+  secondary accent (links, info, focus) and pale yellow for "pending". No navy/black. Fonts self-hosted in `public/fonts`: Fraunces
+  (display) + Plus Jakarta Sans (UI). Icons: `lucide-react`; icon-only actions use `IconButton` with a label. Staff pages render inside
+  `StaffShell` (sidebar ≥1024px, bottom tabs on phones); student pages inside `StudentScreen`. Mobile-first, 44px touch targets,
   `data-testid` on interactive elements. jsPDF lives only in `src/lib/pass-pdf.ts` (keep it out of other chunks);
   the ticket drawing (PDF + shared PNG) is in `src/lib/pass-image.ts`. QR codes use error correction H with `/logo-qr.png` in the centre.

@@ -1,11 +1,18 @@
 // The pass as a picture: drawn once on a canvas, used for the PNG (WhatsApp / gallery) and the PDF.
 import { type SavedPass, formatEventDate, qrDataUrl } from "./pass";
 
-const NAVY = "#0B192C";
-const GOLD = "#D4AF37";
-const IVORY = "#FDFBF7";
-const DISPLAY = '"Playfair Display", Georgia, serif';
-const TEXT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+// Same palette as styles.css (logo crimson, gold, white).
+const PAGE = "#FFFFFF";
+const CRIMSON_600 = "#C1222A";
+const CRIMSON_700 = "#A11B22";
+const CRIMSON_900 = "#4F0C10";
+const CRIMSON_950 = "#2E0709";
+const TEXT_2 = "#7A4A4E";
+const GOLD_200 = "#F1E3BB";
+const GOLD_300 = "#E8D39A";
+const GOLD_700 = "#8A6A1F";
+const DISPLAY = '"Fraunces", Georgia, serif';
+const SANS = '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -17,12 +24,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-/** Letter-spaced text centred on cx (canvas letterSpacing isn't available everywhere). */
-function spaced(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, spacing: number) {
+/** Letter-spaced text centred on x (or starting at x) — canvas letterSpacing isn't available everywhere. */
+function spaced(ctx: CanvasRenderingContext2D, text: string, x0: number, y: number, spacing: number, align: "center" | "left" = "center") {
   const chars = [...text];
   const widths = chars.map((c) => ctx.measureText(c).width);
   const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
-  let x = cx - total / 2;
+  let x = align === "center" ? x0 - total / 2 : x0;
   ctx.textAlign = "left";
   chars.forEach((c, i) => { ctx.fillText(c, x, y); x += widths[i] + spacing; });
 }
@@ -54,93 +61,146 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   return img;
 }
 
-/** Draws the ticket on an A5-proportioned canvas (≈210 dpi). Long values wrap instead of running off the ticket. */
+/** Draws the ticket on an A5-proportioned canvas (≈210 dpi), matching the on-screen pass. Long values wrap. */
 export async function drawTicket(p: SavedPass): Promise<HTMLCanvasElement> {
   try {
     await Promise.all([
-      document.fonts.load(`700 120px "Playfair Display"`),
-      document.fonts.load(`700 30px Inter`),
-      document.fonts.load(`500 30px Inter`),
+      document.fonts.load(`600 40px "Fraunces"`),
+      document.fonts.load(`700 30px "Plus Jakarta Sans"`),
+      document.fonts.load(`600 30px "Plus Jakarta Sans"`),
     ]);
   } catch { /* fall back to system fonts */ }
   const W = 1240, H = 1754;
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d")!;
-  ctx.fillStyle = IVORY;
+  ctx.fillStyle = PAGE;
   ctx.fillRect(0, 0, W, H);
 
-  const tx = 110, ty = 100, tw = W - 220, th = H - 200, cx = W / 2;
-  roundRect(ctx, tx, ty, tw, th, 56);
-  ctx.fillStyle = NAVY;
+  // Ticket paper with a gold double border
+  const tx = 90, ty = 80, tw = W - 180, th = H - 160, cx = W / 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(79, 12, 16, 0.12)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
+  roundRect(ctx, tx, ty, tw, th, 64);
+  const paper = ctx.createLinearGradient(0, ty, 0, ty + th);
+  paper.addColorStop(0, "#FFFDF8");
+  paper.addColorStop(1, "#FFF8EE");
+  ctx.fillStyle = paper;
   ctx.fill();
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = GOLD;
+  ctx.restore();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = GOLD_300;
+  roundRect(ctx, tx, ty, tw, th, 64);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = GOLD_200;
+  roundRect(ctx, tx + 18, ty + 18, tw - 36, th - 36, 48);
   ctx.stroke();
 
-  ctx.fillStyle = GOLD;
-  ctx.font = `700 28px ${TEXT}`;
-  spaced(ctx, "DELTA ACADEMY PRESENTS", cx, ty + 110, 12);
-  ctx.fillStyle = IVORY;
-  ctx.font = `700 124px ${DISPLAY}`;
-  ctx.textAlign = "center";
-  ctx.fillText("OLAM 3.0", cx, ty + 250);
-  ctx.globalAlpha = 0.85;
-  ctx.font = `500 30px ${TEXT}`;
-  spaced(ctx, "A GRAND WEDDING", cx, ty + 310, 18);
-  ctx.globalAlpha = 1;
+  ctx.fillStyle = GOLD_700;
+  ctx.font = `700 24px ${SANS}`;
+  spaced(ctx, "DELTA ACADEMY PRESENTS", cx, ty + 92, 9);
 
-  ctx.fillStyle = "rgba(212,175,55,0.5)";
-  ctx.fillRect(tx + 70, ty + 355, tw - 140, 3);
+  try {
+    const logo = await loadImage("/logo-mark.webp");
+    const lh = 240, lw = (logo.naturalWidth / logo.naturalHeight) * lh;
+    ctx.drawImage(logo, cx - lw / 2, ty + 112, lw, lh);
+  } catch {
+    ctx.fillStyle = CRIMSON_900;
+    ctx.font = `600 110px ${DISPLAY}`;
+    ctx.textAlign = "center";
+    ctx.fillText("OLAM 3.0", cx, ty + 280);
+  }
 
-  const qrSize = 460, pad = 34, boxY = ty + 395;
+  // "ENTRY PASS" tag
+  ctx.font = `700 22px ${SANS}`;
+  const tagW = 250, tagY = ty + 376;
+  roundRect(ctx, cx - tagW / 2, tagY, tagW, 46, 23);
+  ctx.fillStyle = CRIMSON_600;
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  spaced(ctx, "ENTRY PASS", cx, tagY + 31, 5);
+
+  // QR on a white tile
+  const qrSize = 400, pad = 26, boxY = ty + 452;
   roundRect(ctx, cx - qrSize / 2 - pad, boxY, qrSize + pad * 2, qrSize + pad * 2, 36);
   ctx.fillStyle = "#FFFFFF";
   ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = GOLD_200;
+  ctx.stroke();
   const qr = await loadImage(await qrDataUrl(p.token, qrSize));
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(qr, cx - qrSize / 2, boxY + pad, qrSize, qrSize);
   ctx.imageSmoothingEnabled = true;
-
   const boxEnd = boxY + qrSize + pad * 2;
-  ctx.fillStyle = GOLD;
-  ctx.font = `700 40px ${TEXT}`;
-  spaced(ctx, p.registration.reference, cx, boxEnd + 60, 10);
 
-  const rows: [string, string][] = [
-    ["GUEST", p.registration.full_name],
-    ["BRANCH", p.registration.branch_name || "—"],
-    ["BATCH", p.registration.batch],
-    ["STATUS", "APPROVED"],
-  ];
-  if (p.event?.event_date) rows.push(["DATE", formatEventDate(p.event.event_date)]);
-  if (p.event?.event_time_venue) rows.push(["VENUE", p.event.event_time_venue]);
+  ctx.fillStyle = CRIMSON_700;
+  ctx.font = `800 36px ${SANS}`;
+  spaced(ctx, p.registration.reference, cx, boxEnd + 62, 8);
 
-  let y = boxEnd + 125;
-  ctx.fillStyle = "rgba(212,175,55,0.25)";
-  ctx.fillRect(tx + 70, y - 42, tw - 140, 2);
-  const lx = tx + 80, rx = tx + tw - 80, valueW = rx - lx - 190;
-  for (const [l, v] of rows) {
-    ctx.textAlign = "left";
-    ctx.fillStyle = GOLD;
-    ctx.font = `700 26px ${TEXT}`;
-    ctx.fillText(l, lx, y);
-    ctx.textAlign = "right";
-    ctx.fillStyle = IVORY;
-    ctx.font = `500 32px ${TEXT}`;
-    const ls = lines(ctx, v, valueW).slice(0, 3);
-    ls.forEach((t, i) => ctx.fillText(t, rx, y + i * 40));
-    y += 52 + (ls.length - 1) * 40;
+  // Perforation with notches
+  const cutY = boxEnd + 108;
+  ctx.save();
+  ctx.setLineDash([16, 12]);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = GOLD_300;
+  ctx.beginPath();
+  ctx.moveTo(tx + 40, cutY);
+  ctx.lineTo(tx + tw - 40, cutY);
+  ctx.stroke();
+  ctx.restore();
+  for (const x of [tx, tx + tw]) {
+    ctx.beginPath();
+    ctx.arc(x, cutY, 26, 0, Math.PI * 2);
+    ctx.fillStyle = PAGE;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = GOLD_300;
+    ctx.beginPath();
+    ctx.arc(x, cutY, 26, x === tx ? -Math.PI / 2 : Math.PI / 2, x === tx ? Math.PI / 2 : (3 * Math.PI) / 2);
+    ctx.stroke();
   }
 
-  ctx.globalAlpha = 0.7;
-  ctx.fillStyle = IVORY;
-  ctx.font = `400 26px ${TEXT}`;
+  // Details: label above value, two columns where it fits
+  const left = tx + 90, right = tx + tw - 90, colW = (right - left - 40) / 2;
+  type Cell = { l: string; v: string; full?: boolean };
+  const cells: Cell[] = [
+    { l: "GUEST", v: p.registration.full_name, full: true },
+    { l: "BRANCH", v: p.registration.branch_name || "—" },
+    { l: "BATCH", v: p.registration.batch },
+  ];
+  if (p.event?.event_date) cells.push({ l: "DATE", v: formatEventDate(p.event.event_date), full: true });
+  if (p.event?.event_time_venue) cells.push({ l: "TIME & VENUE", v: p.event.event_time_venue, full: true });
+
+  let y = cutY + 78;
+  for (let i = 0; i < cells.length; i++) {
+    const row = cells[i].full ? [cells[i]] : [cells[i], cells[i + 1]].filter((c) => c && !c.full);
+    if (!cells[i].full && row.length === 2) i++;
+    let maxLines = 1;
+    row.forEach((c, j) => {
+      const x = left + j * (colW + 40);
+      const w = c.full ? right - left : colW;
+      ctx.textAlign = "left";
+      ctx.fillStyle = GOLD_700;
+      ctx.font = `700 21px ${SANS}`;
+      spaced(ctx, c.l, x, y, 3, "left");
+      ctx.fillStyle = CRIMSON_950;
+      ctx.font = `600 31px ${SANS}`;
+      ctx.textAlign = "left";
+      const ls = lines(ctx, c.v, w).slice(0, 3);
+      ls.forEach((t, k) => ctx.fillText(t, x, y + 42 + k * 40));
+      maxLines = Math.max(maxLines, ls.length);
+    });
+    y += 42 + (maxLines - 1) * 40 + 58;
+  }
+
+  ctx.fillStyle = TEXT_2;
+  ctx.font = `500 23px ${SANS}`;
   ctx.textAlign = "center";
-  const note = lines(ctx, "Show this pass at the entrance (printed or on your phone). Each pass admits one guest, one time.", tw - 200);
-  let ny = Math.max(y + 20, ty + th - 50 - (note.length - 1) * 38);
-  for (const t of note) { ctx.fillText(t, cx, ny); ny += 38; }
-  ctx.globalAlpha = 1;
+  ctx.fillText("Show this pass at the entrance · One entry per guest", cx, Math.max(y + 6, ty + th - 58));
   return cv;
 }
 

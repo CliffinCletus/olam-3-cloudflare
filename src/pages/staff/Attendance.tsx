@@ -1,7 +1,8 @@
+import { AlertTriangle, ClipboardCheck, Copy, Download, RefreshCw, ShieldX, UserCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api, downloadCsv } from "../../api";
-import { BranchFilter, PageHead, canExportCsv, useBranches, useStaff } from "../../components/Staff";
-import { Button, Pill, Spinner, type Tone } from "../../components/ui";
+import { BranchFilter, StaffShell, canExportCsv, useBranches, useStaff } from "../../components/Staff";
+import { Alert, Button, EmptyState, IconButton, Pill, Segmented, Spinner, type Tone } from "../../components/ui";
 
 type CheckIn = { id: string; checked_in_at: string; scanner_name?: string; station?: string; full_name: string; reference: string; batch: string; branch_name?: string };
 type Attempt = { id: string; result: string; attempted_at: string; scanner_name?: string; station?: string; full_name?: string; reference?: string; batch?: string; branch_name?: string };
@@ -41,55 +42,65 @@ export default function Attendance() {
   }
 
   return (
-    <div className="staff-shell">
-      <PageHead eyebrow="ATTENDANCE HISTORY" title="Check-in log">
+    <StaffShell user={user} title="Check-in log" sub="Everyone who has entered, plus refused and duplicate scans."
+      actions={<IconButton label="Refresh" icon={<RefreshCw />} loading={loading} onClick={() => load(branchId)} />}>
+      <Segmented label="View" value={view} onChange={setView} options={[
+        { id: "checkins", name: "Check-ins", count: data?.checkins.length },
+        { id: "attempts", name: "Refused scans", count: data?.attempts.length },
+      ]} testPrefix="attendance-view" />
+      <div className="toolbar mt-12">
         <BranchFilter user={user} branches={branches} value={branchId} onChange={(id) => { setBranchId(id); load(id); }} testPrefix="attendance-branch" />
-        <div className="segment">
-          <button type="button" className={view === "checkins" ? "on" : ""} onClick={() => setView("checkins")} data-testid="attendance-view-checkins">Check-ins ({data?.checkins.length ?? 0})</button>
-          <button type="button" className={view === "attempts" ? "on" : ""} onClick={() => setView("attempts")} data-testid="attendance-view-attempts">Refused scans ({data?.attempts.length ?? 0})</button>
-        </div>
-      </PageHead>
-      <main className="staff-body">
-        <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}><button type="button" className="chip-btn" onClick={() => load(branchId)}>↻ Refresh</button></div>
+        <span style={{ flex: 1 }} />
         {canExportCsv(user) ? (
-          <Button variant="navy" small className="mb-12" testId="attendance-export-btn" onClick={exportCsv}>
-            Export {view === "checkins" ? `check-ins (${data?.checkins.length ?? 0})` : `refused scans (${data?.attempts.length ?? 0})`} as CSV
+          <Button variant="secondary" small block={false} icon={<Download />} testId="attendance-export-btn" onClick={exportCsv}>
+            Export {view === "checkins" ? "check-ins" : "refused scans"}
           </Button>
         ) : null}
-        {loading ? <Spinner /> : null}
-        {err ? <p className="err" data-testid="attendance-error">{err}</p> : null}
-        {!loading && data && view === "checkins" ? (
-          <>
-            {data.checkins.length === 0 ? <p className="empty">No one has checked in yet.</p> : null}
+      </div>
+      {loading && !data ? <Spinner /> : null}
+      {err ? <Alert tone="error" testId="attendance-error">{err}</Alert> : null}
+
+      {data && view === "checkins" ? (
+        data.checkins.length === 0 ? <EmptyState icon={<ClipboardCheck />} title="No one has checked in yet">Scanned passes appear here instantly.</EmptyState> : (
+          <div className="list">
             {data.checkins.map((c) => (
-              <div className="card" key={c.id}>
-                <div className="item-top"><span className="name">{c.full_name}</span><span className="small muted">{fmt(c.checked_in_at)}</span></div>
-                <p className="meta">{c.reference} • {c.branch_name} • {c.batch}</p>
-                <p className="meta">By {c.scanner_name || "—"} • Station {c.station || "—"}</p>
+              <div className="list-item" key={c.id}>
+                <span className="lead-ico" style={{ background: "var(--olive-100)", color: "var(--olive-700)" }}><UserCheck /></span>
+                <div className="main">
+                  <div className="item-top"><span className="name">{c.full_name}</span><span className="small muted num">{fmt(c.checked_in_at)}</span></div>
+                  <div className="meta"><span className="ref-tag">{c.reference}</span> · {c.branch_name} · {c.batch}</div>
+                  <div className="meta">By {c.scanner_name || "—"} · {c.station || "—"}</div>
+                </div>
               </div>
             ))}
-          </>
-        ) : null}
-        {!loading && data && view === "attempts" ? (
-          <>
-            <div className="card" style={{ background: "var(--tertiary)" }}>
-              <div className="name" data-testid="attendance-duplicate-count">{data.duplicate_count} duplicate scan attempts</div>
-              <p className="meta">Passes that were scanned again after entry. No second entry was recorded.</p>
+          </div>
+        )
+      ) : null}
+
+      {data && view === "attempts" ? (
+        <>
+          <div className="mb-12"><Alert tone="warning" testId="attendance-duplicate-count"><b>{data.duplicate_count} duplicate scan attempts.</b> Passes scanned again after entry — no second entry was recorded.</Alert></div>
+          {data.attempts.length === 0 ? <EmptyState icon={<ShieldX />} title="No refused scans" /> : (
+            <div className="list">
+              {data.attempts.map((a) => {
+                const r = RESULT_LABEL[a.result] ?? { label: a.result, tone: "error" as Tone };
+                return (
+                  <div className="list-item" key={a.id}>
+                    <span className="lead-ico" style={r.tone === "warning" ? { background: "var(--yellow-100)", color: "var(--yellow-800)" } : { background: "var(--c-100)", color: "var(--c-700)" }}>
+                      {r.tone === "warning" ? <Copy /> : <AlertTriangle />}
+                    </span>
+                    <div className="main">
+                      <div className="item-top"><span className="name">{a.full_name || "Unknown pass"}</span><Pill label={r.label} tone={r.tone} /></div>
+                      {a.reference ? <div className="meta"><span className="ref-tag">{a.reference}</span> · {a.branch_name} · {a.batch}</div> : null}
+                      <div className="meta num">{fmt(a.attempted_at)} · by {a.scanner_name || "—"} · {a.station || "—"}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {data.attempts.length === 0 ? <p className="empty">No refused scans.</p> : null}
-            {data.attempts.map((a) => {
-              const r = RESULT_LABEL[a.result] ?? { label: a.result, tone: "error" as Tone };
-              return (
-                <div className="card" key={a.id}>
-                  <div className="item-top"><span className="name">{a.full_name || "Unknown pass"}</span><Pill label={r.label} tone={r.tone} /></div>
-                  {a.reference ? <p className="meta">{a.reference} • {a.branch_name} • {a.batch}</p> : null}
-                  <p className="meta">{fmt(a.attempted_at)} • By {a.scanner_name || "—"} • Station {a.station || "—"}</p>
-                </div>
-              );
-            })}
-          </>
-        ) : null}
-      </main>
-    </div>
+          )}
+        </>
+      ) : null}
+    </StaffShell>
   );
 }

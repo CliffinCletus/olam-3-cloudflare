@@ -1,9 +1,10 @@
+import { Clock, Mail, Phone, RefreshCw, Search, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { type EventInfo, type Registration, post } from "../api";
-import { BgScreen } from "../components/BgScreen";
 import { PushOptIn } from "../components/PushOptIn";
-import { Button, Field, Pill, Spinner, statusTone } from "../components/ui";
+import { StudentScreen } from "../components/StudentScreen";
+import { Alert, Button, Field, Pill, Spinner, WithIcon, statusTone } from "../components/ui";
 import { type Me, forgetMe, loadMe, loadPass, saveMe, savePass } from "../lib/pass";
 
 type Lookup = { registration: Registration; pass_token: string | null; event: EventInfo };
@@ -52,53 +53,60 @@ export default function MyPass() {
 
   const reg = data?.registration;
   return (
-    <BgScreen>
-      <div className="panel">
-        <button type="button" className="back" onClick={() => nav("/", { state: { home: true } })}>← Home</button>
-        <div className="eyebrow">RETRIEVE YOUR INVITATION</div>
-        <h1>My Registration</h1>
-        {auto ? <Spinner /> : null}
-        {!auto && !reg ? (
-          <>
+    <StudentScreen back>
+      {auto ? <Spinner /> : null}
+      {!auto && !reg ? (
+        <div className="sheet">
+          <div className="sheet-head">
+            <div className="eyebrow">Your invitation</div>
+            <h1>Find my pass</h1>
             <p className="sub">Enter the email and mobile number you registered with.</p>
-            <form className="mt-24" onSubmit={(e) => { e.preventDefault(); lookup(); }} noValidate>
-              <Field label="Email" htmlFor="mp-email">
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); lookup(); }} noValidate>
+            <Field label="Email" htmlFor="mp-email">
+              <WithIcon icon={<Mail />}>
                 <input id="mp-email" className="input" data-testid="status-email-input" value={email} onChange={(e) => setEmail(e.target.value)} type="email" inputMode="email" autoCapitalize="none" autoComplete="email" placeholder="you@example.com" />
-              </Field>
-              <Field label="Mobile Number" htmlFor="mp-mobile">
-                <input id="mp-mobile" className="input" data-testid="status-mobile-input" value={mobile} onChange={(e) => setMobile(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="+91 9876543210" maxLength={20} />
-              </Field>
-              <Button type="submit" testId="status-lookup-btn" loading={loading}>Find my registration</Button>
-              {error ? <p className="err" data-testid="status-error" role="alert">{error}</p> : null}
-            </form>
-          </>
-        ) : null}
+              </WithIcon>
+            </Field>
+            <Field label="Mobile number" htmlFor="mp-mobile">
+              <WithIcon icon={<Phone />}>
+                <input id="mp-mobile" className="input" data-testid="status-mobile-input" value={mobile} onChange={(e) => setMobile(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="+91 98765 43210" maxLength={20} />
+              </WithIcon>
+            </Field>
+            {error ? <Alert tone="error" testId="status-error">{error}</Alert> : null}
+            <Button large type="submit" className="mt-16" icon={<Search />} testId="status-lookup-btn" loading={loading}>Find my registration</Button>
+          </form>
+        </div>
+      ) : null}
 
-        {reg ? (
-          <>
-            <div className="card mt-24" data-testid="status-card">
-              <div className="item-top">
-                <span className="label-sm">STATUS</span>
-                <Pill label={reg.status} tone={statusTone(reg.status)} />
-              </div>
-              <div style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 700, marginTop: 8 }}>{reg.full_name}</div>
-              <p className="meta">{reg.branch_name} • {reg.batch}{reg.batch_no ? ` • Batch No. ${reg.batch_no}` : ""}</p>
-              {reg.faculty_name ? <p className="meta">Faculty: {reg.faculty_name}</p> : null}
-              <p className="meta">Ref: {reg.reference}</p>
-              {reg.status === "pending" ? <p className="meta mt-12">Your branch coordinator is reviewing your details. Open this app again later — your pass appears here as soon as you're approved.</p> : null}
-              {reg.status === "rejected" ? (
-                <div className="mt-12">
-                  <p className="meta">Your registration was not approved.</p>
-                  {reg.rejection_reason ? <p className="meta">Reason: {reg.rejection_reason}</p> : null}
-                </div>
-              ) : null}
-              <Button className="mt-16" variant="navy" loading={loading} onClick={() => lookup()} testId="status-refresh-btn">Check again</Button>
+      {reg ? (
+        <>
+          <div className="sheet" data-testid="status-card">
+            <div className="row between">
+              <div className="eyebrow">Registration status</div>
+              <Pill label={reg.status} tone={statusTone(reg.status)} />
             </div>
-            {reg.status !== "rejected" ? <PushOptIn me={me} /> : null}
-            <button type="button" className="link-btn mt-16" style={{ width: "100%" }} onClick={notMe} data-testid="status-not-me-btn">Not you? Use a different registration</button>
-          </>
-        ) : null}
-      </div>
-    </BgScreen>
+            <h1 className="mt-8">{reg.full_name}</h1>
+            <dl className="kv">
+              <div><dt>Branch</dt><dd>{reg.branch_name}</dd></div>
+              <div><dt>Batch</dt><dd>{reg.batch}{reg.batch_no ? ` · No. ${reg.batch_no}` : ""}</dd></div>
+              {reg.faculty_name ? <div><dt>Faculty</dt><dd>{reg.faculty_name}</dd></div> : null}
+              <div><dt>Reference</dt><dd>{reg.reference}</dd></div>
+            </dl>
+            {reg.status === "pending" ? (
+              <div className="status-banner warning"><Clock /><div><strong>Waiting for approval</strong>Your branch coordinator is reviewing your details. Your pass appears here as soon as you're approved.</div></div>
+            ) : null}
+            {reg.status === "rejected" ? (
+              <div className="status-banner error"><XCircle /><div><strong>Not approved</strong>{reg.rejection_reason ? `Reason: ${reg.rejection_reason}` : "Please contact your branch coordinator."}</div></div>
+            ) : null}
+            <Button className="mt-16" variant="secondary" icon={<RefreshCw />} loading={loading} onClick={() => lookup()} testId="status-refresh-btn">Check again</Button>
+          </div>
+          {reg.status !== "rejected" ? <PushOptIn me={me} /> : null}
+          <div className="pass-links mt-8">
+            <button type="button" className="link-btn muted" onClick={notMe} data-testid="status-not-me-btn">Not you? Use a different registration</button>
+          </div>
+        </>
+      ) : null}
+    </StudentScreen>
   );
 }

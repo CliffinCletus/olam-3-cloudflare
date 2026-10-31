@@ -1,8 +1,9 @@
+import { Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { type Batch, type Branch, api, post } from "../api";
-import { BgScreen } from "../components/BgScreen";
-import { Button, Check, Field, Spinner } from "../components/ui";
+import { StudentScreen } from "../components/StudentScreen";
+import { Alert, Button, Check, Chips, Field, Spinner, WithIcon } from "../components/ui";
 import { saveMe } from "../lib/pass";
 
 type Settings = { registration_open: boolean; closed_message: string; privacy_notice: string };
@@ -43,56 +44,66 @@ export default function Register() {
   }
 
   return (
-    <BgScreen>
-      <div className="panel">
-        <button type="button" className="back" onClick={() => nav("/")} data-testid="register-back-btn">← Back</button>
-        <div className="eyebrow">EVENT REGISTRATION</div>
-        <h1>Your invitation awaits</h1>
-        {!closed ? <p className="sub">Takes under two minutes. Approval comes from your branch coordinator.</p> : null}
+    <StudentScreen back>
+      <div className="sheet">
+        <div className="sheet-head">
+          <div className="eyebrow">Event registration</div>
+          <h1>Your invitation awaits</h1>
+          {!closed ? <p className="sub">Takes under two minutes. Your branch coordinator approves it, then your QR pass appears here.</p> : null}
+        </div>
 
         {!settings && !error ? <Spinner /> : null}
         {closed ? (
           <div className="closed-box" data-testid="register-closed">
-            <strong>Registration closed</strong>
-            <p>{settings!.closed_message}</p>
+            <Lock />
+            <div><strong>Registration closed</strong><p>{settings!.closed_message}</p></div>
           </div>
         ) : settings ? (
-          <form className="mt-24" onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
-            <Field label="Full Name" htmlFor="r-name">
-              <input id="r-name" className="input" data-testid="register-name-input" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="Enter your full name" autoComplete="name" maxLength={120} />
+          <form onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
+            <div className="section-label">About you</div>
+            <Field label="Full name" htmlFor="r-name">
+              <WithIcon icon={<User />}>
+                <input id="r-name" className="input" data-testid="register-name-input" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="As it should appear on your pass" autoComplete="name" maxLength={120} />
+              </WithIcon>
             </Field>
-            <Field label="Mobile Number" htmlFor="r-mobile" hint="One registration per mobile number">
-              <input id="r-mobile" className="input" data-testid="register-mobile-input" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} type="tel" inputMode="tel" placeholder="+91 9876543210" autoComplete="tel" maxLength={20} />
+            <Field label="Mobile number" htmlFor="r-mobile" hint="One registration per mobile number.">
+              <WithIcon icon={<Phone />}>
+                <input id="r-mobile" className="input" data-testid="register-mobile-input" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} type="tel" inputMode="tel" placeholder="+91 98765 43210" autoComplete="tel" maxLength={20} />
+              </WithIcon>
             </Field>
-            <Field label="Email Address" htmlFor="r-email" hint="One registration per email. Your email and mobile number retrieve your pass.">
-              <input id="r-email" className="input" data-testid="register-email-input" value={form.email} onChange={(e) => set("email", e.target.value)} type="email" inputMode="email" autoCapitalize="none" placeholder="you@example.com" autoComplete="email" />
+            <Field label="Email address" htmlFor="r-email" hint="Your email and mobile number open your pass on any phone.">
+              <WithIcon icon={<Mail />}>
+                <input id="r-email" className="input" data-testid="register-email-input" value={form.email} onChange={(e) => set("email", e.target.value)} type="email" inputMode="email" autoCapitalize="none" placeholder="you@example.com" autoComplete="email" />
+              </WithIcon>
             </Field>
+
+            <div className="section-label">Your academy</div>
             <Field label="Branch">
-              <div className="chips">
-                {branches.map((b) => (
-                  <button type="button" key={b.id} className={`chip ${form.branch_id === b.id ? "on" : ""}`} onClick={() => set("branch_id", b.id)} data-testid={`register-branch-${b.id}`}>{b.name}</button>
-                ))}
-              </div>
+              <Chips options={branches.map((b) => ({ id: b.id, name: b.name }))} value={form.branch_id} onChange={(v) => set("branch_id", v)} testPrefix="register-branch" />
             </Field>
             <Field label="Batch">
-              <div className="chips">
-                {batches.map((b) => (
-                  <button type="button" key={b.id} className={`chip ${form.batch === b.name ? "on" : ""}`} onClick={() => set("batch", b.name)} data-testid={`register-batch-${b.id}`}>{b.name}</button>
-                ))}
+              <Chips options={batches.map((b) => ({ id: b.name, name: b.name }))} value={form.batch} onChange={(v) => set("batch", v)} />
+            </Field>
+            <div className="row wrap" style={{ gap: "0 12px", alignItems: "flex-start" }}>
+              <div style={{ flex: "1 1 140px" }}>
+                <Field label="Batch no." htmlFor="r-bno">
+                  <input id="r-bno" className="input" data-testid="register-batchno-input" value={form.batch_no} onChange={(e) => set("batch_no", e.target.value)} placeholder="e.g. 12" autoCapitalize="characters" maxLength={30} />
+                </Field>
               </div>
-            </Field>
-            <Field label="Batch No." htmlFor="r-bno">
-              <input id="r-bno" className="input" data-testid="register-batchno-input" value={form.batch_no} onChange={(e) => set("batch_no", e.target.value)} placeholder="Enter your batch number" autoCapitalize="characters" maxLength={30} />
-            </Field>
-            <Field label="Faculty Name" htmlFor="r-fac">
-              <input id="r-fac" className="input" data-testid="register-faculty-input" value={form.faculty_name} onChange={(e) => set("faculty_name", e.target.value)} placeholder="Enter your faculty's name" autoCapitalize="words" maxLength={120} />
-            </Field>
+              <div style={{ flex: "2 1 200px" }}>
+                <Field label="Faculty name" htmlFor="r-fac">
+                  <input id="r-fac" className="input" data-testid="register-faculty-input" value={form.faculty_name} onChange={(e) => set("faculty_name", e.target.value)} placeholder="Your teacher's name" autoCapitalize="words" maxLength={120} />
+                </Field>
+              </div>
+            </div>
+
+            <div className="section-label">Confirm</div>
             <Check on={form.confirm} onClick={() => set("confirm", !form.confirm)} testId="register-confirm-check">
-              I confirm the information I have provided is accurate and I am a current Delta Academy student.
+              I confirm the information above is accurate and I am a current Delta Academy student.
             </Check>
             {settings.privacy_notice ? (
               <div className="privacy" data-testid="register-privacy-notice">
-                <div className="t">PRIVACY NOTICE</div>
+                <div className="t"><ShieldCheck />Privacy notice</div>
                 <p>{settings.privacy_notice}</p>
               </div>
             ) : null}
@@ -102,14 +113,14 @@ export default function Register() {
             <button type="submit" hidden />
           </form>
         ) : null}
-        {error && !settings ? <p className="err">{error}</p> : null}
+        {error && !settings ? <Alert tone="error">{error}</Alert> : null}
       </div>
       {settings && !closed ? (
-        <div className="cta-bar">
-          {error ? <p className="err" data-testid="register-error" role="alert">{error}</p> : null}
-          <Button testId="register-submit-btn" onClick={submit} loading={submitting}>Submit Registration</Button>
+        <div className="cta-bar" style={{ margin: "16px -16px calc(-32px - var(--safe-bottom))" }}>
+          {error ? <Alert tone="error" testId="register-error">{error}</Alert> : null}
+          <Button large testId="register-submit-btn" onClick={submit} loading={submitting}>Submit registration</Button>
         </div>
       ) : null}
-    </BgScreen>
+    </StudentScreen>
   );
 }

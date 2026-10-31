@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      includeAssets: ["favicon.png", "apple-touch-icon.png", "images/olam-bg.jpg", "fonts/*.woff2", "sounds/*.wav"],
+      includeAssets: ["favicon.png", "apple-touch-icon.png", "logo-mark.webp", "logo-qr.png", "fonts/*.woff2", "sounds/*.wav"],
       manifest: {
         id: "/",
         name: "OLAM 3.0 – A Grand Wedding",
@@ -18,8 +18,8 @@ export default defineConfig({
         scope: "/",
         display: "standalone",
         orientation: "portrait",
-        background_color: "#0B192C",
-        theme_color: "#0B192C",
+        background_color: "#FFFAF8",
+        theme_color: "#FFFAF8",
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
@@ -28,7 +28,7 @@ export default defineConfig({
       },
       workbox: {
         importScripts: ["/push-sw.js"], // push reminders + notification taps
-        globPatterns: ["**/*.{js,css,html,png,jpg,woff2,wav,svg}"],
+        globPatterns: ["**/*.{js,css,html,png,webp,woff2,wav,svg}"],
         // jsPDF's optional html()/svg() helpers — never used, so don't make phones download them.
         globIgnores: ["**/html2canvas*.js", "**/purify.es*.js", "**/index.es*.js"],
         navigateFallback: "/index.html",

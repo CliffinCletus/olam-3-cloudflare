@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import QrScanner from "qr-scanner";
 import { api, clearSession, post } from "../../api";
 import { useStaff } from "../../components/Staff";
-import { Button, Field, fmtDateTime, fmtTime } from "../../components/ui";
+import { ArrowLeft, Camera, CameraOff, Check, CheckCircle2, ClipboardCheck, Copy, Keyboard, LogOut, ScanLine, WifiOff, XCircle } from "lucide-react";
+import { Button, EmptyState, Field, IconButton, Pill, WithIcon, fmtDateTime, fmtTime } from "../../components/ui";
 import { stationName } from "../../lib/whatsapp";
 
 type ScanResult = {
@@ -14,8 +15,6 @@ type ScanResult = {
   registration?: { full_name: string; reference: string; batch: string; branch_name?: string | null };
 };
 type Hist = { id: string; full_name: string; reference: string; batch: string; branch_name: string; checked_in_at: string };
-
-const TONE: Record<string, string> = { VALID: "#10B981", ALREADY_CHECKED_IN: "#F59E0B", ERROR: "#3B82F6" };
 
 export default function Scanner() {
   const nav = useNavigate();
@@ -97,21 +96,15 @@ export default function Scanner() {
   }
 
   if (!user) return <div className="scanner" />;
-  const tone = result ? TONE[result.result] || "#EF4444" : "";
+  const kind = !result ? "" : result.result === "VALID" ? "valid" : result.result === "ALREADY_CHECKED_IN" ? "dup" : result.result === "ERROR" ? "net" : "bad";
+  const LABEL: Record<string, string> = { VALID: "Entry approved", ALREADY_CHECKED_IN: "Already used", NOT_APPROVED: "Not approved", REVOKED: "Pass revoked", INVALID: "Invalid pass", ERROR: "Connection problem" };
 
   return (
     <div className="scanner">
-      <header className="staff-header">
-        <div className="top">
-          <div style={{ minWidth: 0 }}>
-            <div className="eyebrow">OLAM 3.0 • SCANNER</div>
-            <div className="hello" style={{ fontSize: 18 }}>{user.name || user.email}</div>
-          </div>
-          <div className="actions">
-            {user.role !== "scanner" ? <button type="button" className="head-link" onClick={() => nav("/staff/dashboard")} data-testid="scanner-dashboard-btn">Dashboard</button> : null}
-            <button type="button" className="head-link" onClick={() => { clearSession(); nav("/staff/login", { replace: true }); }} data-testid="scanner-logout-btn">Sign out</button>
-          </div>
-        </div>
+      <header className="topbar">
+        {user.role !== "scanner" ? <IconButton variant="ghost" label="Back to dashboard" icon={<ArrowLeft />} onClick={() => nav("/staff/dashboard")} testId="scanner-dashboard-btn" /> : <img className="logo" src="/logo-mark.webp" alt="" />}
+        <div className="t">Gate scanner<div className="small muted" style={{ fontFamily: "var(--sans)", fontWeight: 500 }}>{user.name || user.email}</div></div>
+        <IconButton variant="ghost" label="Sign out" icon={<LogOut />} onClick={() => { clearSession(); nav("/staff/login", { replace: true }); }} testId="scanner-logout-btn" />
       </header>
 
       <div className={`cam ${result ? "small" : ""}`}>
@@ -119,72 +112,72 @@ export default function Scanner() {
         {camState === "on" ? <div className="viewfinder" /> : null}
         {camState !== "on" ? (
           <div className="perm">
+            <div className="ico">{camState === "denied" || camState === "nocam" ? <CameraOff /> : <ScanLine />}</div>
             {camState === "denied" ? (
               <>
                 <strong>Camera permission needed</strong>
-                <p className="small" style={{ opacity: 0.8 }}>Allow camera access for this site in your browser settings, then tap below. You can also type a reference underneath.</p>
+                <p>Allow camera access for this site in your browser settings, then tap below. You can also type a reference underneath.</p>
               </>
             ) : camState === "nocam" ? (
               <strong>No camera found on this device</strong>
             ) : (
               <>
                 <strong>Ready to scan entry passes</strong>
-                <p className="small" style={{ opacity: 0.8 }}>Point the back camera at the QR code on the student's pass.</p>
+                <p>Point the back camera at the QR code on the student's pass.</p>
               </>
             )}
             {camState !== "nocam" ? (
-              <Button onClick={startCamera} loading={camState === "starting"} testId="scanner-start-btn">{camState === "denied" ? "Try again" : "Start scanning"}</Button>
+              <Button block={false} variant="gold" icon={<Camera />} onClick={startCamera} loading={camState === "starting"} testId="scanner-start-btn">{camState === "denied" ? "Try again" : "Start scanning"}</Button>
             ) : null}
           </div>
         ) : null}
       </div>
 
       <div className="body">
-        {result?.result === "VALID" && result.registration ? (
-          <div className="welcome" data-testid="scanner-welcome-card">
-            <div className="ey">✦ ENTRY APPROVED ✦</div>
-            <div className="hello">Welcome to OLAM 3.0,</div>
-            <div className="nm" data-testid="scanner-welcome-name">{result.registration.full_name}</div>
-            <div className="dv" />
-            <div className="br" data-testid="scanner-welcome-branch">{result.registration.branch_name}</div>
-            <div className="mt">{result.registration.batch} • {result.registration.reference}</div>
-            <div className="ln">OLAM 3.0 – A Grand Wedding awaits you. Enjoy the celebration!</div>
-            {result.checked_in_at ? <div className="mt">Checked in at {fmtTime(result.checked_in_at)}</div> : null}
-            <Button className="mt-16" onClick={resume} testId="scanner-continue-btn">Scan next</Button>
-          </div>
-        ) : result ? (
-          <div className="result" style={{ borderColor: tone }} data-testid="scanner-result-card">
-            <span className="badge" style={{ background: tone }}>{result.result.replace(/_/g, " ")}</span>
-            <div className="msg">{result.message}</div>
+        {result ? (
+          <div className={`result-card ${kind}`} data-testid={kind === "valid" ? "scanner-welcome-card" : "scanner-result-card"}>
+            <div className="ico">{kind === "valid" ? <CheckCircle2 /> : kind === "dup" ? <Copy /> : kind === "net" ? <WifiOff /> : <XCircle />}</div>
+            <div className="label">{LABEL[result.result] ?? result.result}</div>
             {result.registration ? (
               <>
-                <div className="nm">{result.registration.full_name}</div>
-                <div className="mt">{result.registration.reference}</div>
-                <div className="mt">{result.registration.branch_name} • {result.registration.batch}</div>
+                {kind === "valid" ? <div className="mt">Welcome to OLAM 3.0 – A Grand Wedding,</div> : <div className="msg">{result.message}</div>}
+                <div className="nm" data-testid={kind === "valid" ? "scanner-welcome-name" : undefined}>{result.registration.full_name}</div>
+                <div className="chip-line">
+                  <Pill label={result.registration.branch_name || "—"} tone="gold" />
+                  <Pill label={result.registration.batch} tone="muted" />
+                  <Pill label={result.registration.reference} tone="info" />
+                </div>
+                {kind === "valid" ? <span className="sr-only" data-testid="scanner-welcome-branch">{result.registration.branch_name}</span> : null}
               </>
-            ) : null}
-            {result.checked_in_at ? <div className="mt">At {fmtDateTime(result.checked_in_at)}{result.scanner_name ? ` • by ${result.scanner_name}` : ""}</div> : null}
-            <Button className="mt-16" onClick={resume} testId="scanner-continue-btn">Scan next</Button>
+            ) : <div className="msg">{result.message}</div>}
+            {result.checked_in_at ? <div className="mt">{kind === "valid" ? "Checked in at " : "Entered at "}{kind === "valid" ? fmtTime(result.checked_in_at) : fmtDateTime(result.checked_in_at)}{result.scanner_name && kind !== "valid" ? ` · by ${result.scanner_name}` : ""}</div> : null}
+            <Button large icon={<ScanLine />} onClick={resume} testId="scanner-continue-btn">Scan next</Button>
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); lastRef.current = { v: "", t: 0 }; submitScan(manual); }}>
-            <Field label="Manual token / reference lookup" htmlFor="sc-manual">
+            <Field label="Manual lookup" htmlFor="sc-manual" hint="Type the reference (OLM-XXXXXX) if a QR won't scan.">
               <div className="row">
-                <input id="sc-manual" className="input grow" value={manual} onChange={(e) => setManual(e.target.value)} autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} placeholder="Paste pass token or OLM-XXXXXX" data-testid="scanner-manual-input" />
-                <Button small type="submit" className="btn-auto" loading={busy} testId="scanner-manual-submit-btn">Check</Button>
+                <div className="grow"><WithIcon icon={<Keyboard />}><input id="sc-manual" className="input" value={manual} onChange={(e) => setManual(e.target.value)} autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} placeholder="OLM-XXXXXX or pass token" data-testid="scanner-manual-input" /></WithIcon></div>
+                <Button block={false} type="submit" loading={busy} testId="scanner-manual-submit-btn">Check</Button>
               </div>
             </Field>
           </form>
         )}
 
-        <div className="section-title">Recent Check-ins</div>
-        {history.length === 0 ? <p className="empty">No scans yet.</p> : null}
-        {history.slice(0, 10).map((h) => (
-          <div className="hist" key={h.id}>
-            <div className="item-top"><span className="name">{h.full_name}</span><span className="t">{fmtTime(h.checked_in_at)}</span></div>
-            <div className="mt">{h.reference} • {h.branch_name} • {h.batch}</div>
+        <div className="group-title mt-24">Recent check-ins<span className="count">{history.length ? `${Math.min(history.length, 10)} latest` : ""}</span></div>
+        {history.length === 0 ? <EmptyState icon={<ClipboardCheck />} title="No scans yet" /> : (
+          <div className="list">
+            {history.slice(0, 10).map((h) => (
+              <div className="hist" key={h.id}>
+                <span className="dot"><Check /></span>
+                <div className="main">
+                  <div className="item-top"><span className="name">{h.full_name}</span><span className="t">{fmtTime(h.checked_in_at)}</span></div>
+                  <div className="meta">{h.reference} · {h.branch_name} · {h.batch}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

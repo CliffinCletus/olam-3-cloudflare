@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { KeyRound, Mail, ScanLine, ShieldCheck, UserCheck, UserPlus, UserX, Users } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { type AuthUser, type Branch, type Role, api, patch, post } from "../../api";
-import { PageHead, useStaff } from "../../components/Staff";
-import { Button, Field, Modal, Pill, Toggle } from "../../components/ui";
+import { StaffShell, useStaff } from "../../components/Staff";
+import { Alert, Button, Chips, Field, IconButton, Modal, Pill, Toggle, WithIcon } from "../../components/ui";
 
 type Staff = AuthUser & { active: boolean };
-const ROLE_TONE = { super_admin: "info", coordinator: "success", scanner: "muted" } as const;
+const ROLE_META: Record<Role, { label: string; tone: "info" | "success" | "gold"; icon: ReactNode; bg: string; fg: string }> = {
+  super_admin: { label: "Admin", tone: "info", icon: <ShieldCheck />, bg: "var(--blue-100)", fg: "var(--blue-600)" },
+  coordinator: { label: "Coordinator", tone: "success", icon: <Users />, bg: "var(--olive-100)", fg: "var(--olive-700)" },
+  scanner: { label: "Scanner", tone: "gold", icon: <ScanLine />, bg: "var(--gold-100)", fg: "var(--gold-700)" },
+};
 const blank = { email: "", name: "", password: "", role: "coordinator" as Role, branch_id: "" };
 
 export default function Manage() {
@@ -47,83 +52,79 @@ export default function Manage() {
   }
 
   return (
-    <div className="staff-shell">
-      <PageHead eyebrow="STAFF MANAGEMENT" title="Accounts" sub="Coordinators approve their own branch; scanners only scan at the gate." />
-      <main className="staff-body">
-        <Button onClick={() => { setErr(null); setShowAdd(true); }} testId="staff-add-btn">+ Add Staff Account</Button>
-        {msg ? <div className={`notice ${msg.ok ? "" : "bad"}`}>{msg.text}</div> : null}
-        <div className="reg-grid">
-          {staff.map((s) => {
-            const branch = branches.find((b) => b.id === s.branch_id);
-            return (
-              <div className="card" key={s.id} data-testid={`staff-card-${s.id}`}>
-                <div className="item-top">
-                  <span className="name">{s.name || s.email}</span>
-                  <Pill label={s.role.replace("_", " ")} tone={ROLE_TONE[s.role]} />
+    <StaffShell user={me} title="Staff accounts" sub="Coordinators approve their own branch; scanners only scan at the gate."
+      actions={<Button small block={false} icon={<UserPlus />} onClick={() => { setErr(null); setShowAdd(true); }} testId="staff-add-btn">Add staff</Button>}>
+      {msg ? <div className="mb-12"><Alert tone={msg.ok ? "success" : "error"}>{msg.text}</Alert></div> : null}
+      <div className="list">
+        {staff.map((s) => {
+          const branch = branches.find((b) => b.id === s.branch_id);
+          const r = ROLE_META[s.role];
+          return (
+            <div className="list-item col" key={s.id} data-testid={`staff-card-${s.id}`}>
+              <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
+                <span className="lead-ico" style={{ width: 38, height: 38, borderRadius: 11, display: "grid", placeItems: "center", background: r.bg, color: r.fg, flex: "0 0 38px" }}>{r.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="item-top"><span className="name">{s.name || s.email}</span><Pill label={r.label} tone={r.tone} /></div>
+                  <div className="meta">{s.email}{branch ? ` · ${branch.name}` : ""}</div>
+                  <div className="row wrap mt-4" style={{ gap: 6 }}>
+                    <Pill label={s.active ? "Active" : "Inactive"} tone={s.active ? "success" : "muted"} />
+                    {s.must_change_password ? <Pill label="Must set new password" tone="warning" /> : null}
+                    {s.id === me?.id ? <Pill label="You" tone="gold" /> : null}
+                  </div>
                 </div>
-                <p className="meta">{s.email}</p>
-                {branch ? <p className="meta">Branch: {branch.name}</p> : null}
-                <p className="meta" style={{ color: s.active ? "var(--success-text)" : "var(--error-text)" }}>{s.active ? "Active" : "Inactive — cannot sign in"}{s.must_change_password ? " • must set a new password" : ""}</p>
-                {s.role === "coordinator" ? (
-                  <div className="mt-8" style={{ border: `1px solid ${s.can_export ? "var(--success)" : "var(--border)"}`, borderRadius: 12, padding: "4px 12px" }}>
-                    <Toggle on={!!s.can_export} onClick={() => update(s, { can_export: !s.can_export })} title="CSV download" sub={s.can_export ? "Allowed — can download their branch list" : "Not allowed"} testId={`staff-csv-toggle-${s.id}`} />
+                {s.id !== me?.id ? (
+                  <div className="row" style={{ gap: 6 }}>
+                    <IconButton small label={`Reset password for ${s.name || s.email}`} icon={<KeyRound />} onClick={() => { setResetFor(s); setResetPw(""); }} testId={`staff-reset-btn-${s.id}`} />
+                    <IconButton small variant={s.active ? "danger" : "success"} label={s.active ? `Deactivate ${s.name || s.email}` : `Reactivate ${s.name || s.email}`} icon={s.active ? <UserX /> : <UserCheck />}
+                      onClick={() => update(s, { active: !s.active }, `${s.name || s.email} ${s.active ? "deactivated" : "reactivated"}.`)} testId={`staff-active-toggle-${s.id}`} />
                   </div>
                 ) : null}
-                {s.id !== me?.id ? (
-                  <div className="actions-row">
-                    <button type="button" className={`chip-btn ${s.active ? "danger" : "success"}`} onClick={() => update(s, { active: !s.active }, `${s.name || s.email} ${s.active ? "deactivated" : "reactivated"}.`)} data-testid={`staff-active-toggle-${s.id}`}>
-                      {s.active ? "Deactivate" : "Reactivate"}
-                    </button>
-                    <button type="button" className="chip-btn" onClick={() => { setResetFor(s); setResetPw(""); }} data-testid={`staff-reset-btn-${s.id}`}>Reset password</button>
-                  </div>
-                ) : <p className="meta mt-8">This is you.</p>}
               </div>
-            );
-          })}
-        </div>
-      </main>
+              {s.role === "coordinator" ? (
+                <div style={{ paddingLeft: 50 }}>
+                  <Toggle on={!!s.can_export} onClick={() => update(s, { can_export: !s.can_export })} title="CSV download" sub={s.can_export ? "Allowed — can download their branch lists" : "Not allowed"} testId={`staff-csv-toggle-${s.id}`} />
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)}>
-        <h2>Add staff</h2>
-        <form className="mt-12" onSubmit={(e) => { e.preventDefault(); create(); }}>
+        <div className="modal-ico success"><UserPlus /></div>
+        <h2>Add staff account</h2>
+        <form className="mt-16" onSubmit={(e) => { e.preventDefault(); create(); }}>
           <Field label="Name" htmlFor="st-name"><input id="st-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="staff-name-input" /></Field>
-          <Field label="Email" htmlFor="st-email"><input id="st-email" className="input" type="email" autoCapitalize="none" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="staff-email-input" /></Field>
-          <Field label="Temporary password (min 8)" htmlFor="st-pw" hint="They'll be asked to choose their own at first sign-in.">
-            <input id="st-pw" className="input" type="text" autoComplete="off" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="staff-password-input" />
+          <Field label="Email" htmlFor="st-email"><WithIcon icon={<Mail />}><input id="st-email" className="input" type="email" autoCapitalize="none" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="staff-email-input" /></WithIcon></Field>
+          <Field label="Temporary password" htmlFor="st-pw" hint="At least 8 characters. They choose their own at first sign-in.">
+            <WithIcon icon={<KeyRound />}><input id="st-pw" className="input" type="text" autoComplete="off" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="staff-password-input" /></WithIcon>
           </Field>
           <Field label="Role">
-            <div className="chips">
-              {(["super_admin", "coordinator", "scanner"] as const).map((r) => (
-                <button type="button" key={r} className={`chip ${form.role === r ? "on" : ""}`} onClick={() => setForm({ ...form, role: r })} data-testid={`staff-role-${r}`}>{r.replace("_", " ")}</button>
-              ))}
-            </div>
+            <Chips options={(["coordinator", "scanner", "super_admin"] as const).map((r) => ({ id: r, name: ROLE_META[r].label }))} value={form.role} onChange={(r) => setForm({ ...form, role: r })} testPrefix="staff-role" />
           </Field>
           {form.role === "coordinator" ? (
             <Field label="Assigned branch">
-              <div className="chips">
-                {branches.map((b) => (
-                  <button type="button" key={b.id} className={`chip ${form.branch_id === b.id ? "on" : ""}`} onClick={() => setForm({ ...form, branch_id: b.id })} data-testid={`staff-branch-${b.id}`}>{b.name}</button>
-                ))}
-              </div>
+              <Chips options={branches.map((b) => ({ id: b.id, name: b.name }))} value={form.branch_id} onChange={(v) => setForm({ ...form, branch_id: v })} testPrefix="staff-branch" />
             </Field>
           ) : null}
-          {err ? <p className="err" style={{ marginBottom: 12 }}>{err}</p> : null}
-          <div className="row">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
+          {err ? <Alert tone="error">{err}</Alert> : null}
+          <div className="modal-actions">
+            <Button variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
             <Button type="submit" loading={busy} testId="staff-save-btn">Create</Button>
           </div>
         </form>
       </Modal>
 
       <Modal open={!!resetFor} onClose={() => setResetFor(null)}>
+        <div className="modal-ico"><KeyRound /></div>
         <h2>Reset password</h2>
-        <p className="sub" style={{ marginBottom: 12 }}>Set a temporary password for {resetFor?.name || resetFor?.email}. They must change it at next sign-in.</p>
-        <Field label="Temporary password (min 8)" htmlFor="rs-pw"><input id="rs-pw" className="input" type="text" autoComplete="off" value={resetPw} onChange={(e) => setResetPw(e.target.value)} data-testid="staff-reset-input" /></Field>
-        <div className="row">
-          <Button variant="ghost" onClick={() => setResetFor(null)}>Cancel</Button>
+        <p className="sub" style={{ marginBottom: 14 }}>Set a temporary password for {resetFor?.name || resetFor?.email}. They must change it at next sign-in.</p>
+        <Field label="Temporary password" htmlFor="rs-pw" hint="At least 8 characters."><input id="rs-pw" className="input" type="text" autoComplete="off" value={resetPw} onChange={(e) => setResetPw(e.target.value)} data-testid="staff-reset-input" /></Field>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={() => setResetFor(null)}>Cancel</Button>
           <Button disabled={resetPw.length < 8} testId="staff-reset-confirm" onClick={async () => { const s = resetFor!; setResetFor(null); await update(s, { password: resetPw }, `Temporary password set for ${s.name || s.email}.`); }}>Set password</Button>
         </div>
       </Modal>
-    </div>
+    </StaffShell>
   );
 }

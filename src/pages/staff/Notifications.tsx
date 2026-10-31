@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, post } from "../../api";
-import { BranchFilter, PageHead, useBranches, useStaff } from "../../components/Staff";
-import { Button, Chips, Field, Modal, Spinner } from "../../components/ui";
+import { BellRing, Send, Sparkles } from "lucide-react";
+import { BranchFilter, StaffShell, useBranches, useStaff } from "../../components/Staff";
+import { Alert, Button, Chips, Field, Modal, Spinner } from "../../components/ui";
 
 type Audience = "all" | "registered" | "pending" | "approved" | "not_arrived";
 type Counts = Record<Audience, number>;
@@ -59,18 +60,14 @@ export default function Notifications() {
     finally { setSending(null); }
   }
 
-  if (!user) return <div className="staff-shell"><Spinner /></div>;
+  if (!user) return <Spinner />;
   const n = counts?.[audience] ?? 0;
   const ready = title.trim().length >= 2 && body.trim().length >= 2 && n > 0 && !sending;
 
   return (
-    <div className="staff-shell">
-      <PageHead eyebrow="PUSH REMINDERS" title="Notify students" sub="Goes to phones where the student tapped “Turn on reminders”. It shows like any app notification, with the phone's notification sound.">
-        <BranchFilter user={user} branches={branches} value={branchId} onChange={(id) => { setBranchId(id); loadCounts(id); }} testPrefix="notify-branch" />
-      </PageHead>
-      <main className="staff-body">
+    <StaffShell user={user} title="Push reminders" sub="Goes to phones where the student tapped “Turn on reminders”. It arrives like any app notification, with the phone's notification sound.">
         <div className="card">
-          <div className="card-title">Who gets it</div>
+          <div className="card-head"><div className="card-title">Who gets it</div><BranchFilter user={user} branches={branches} value={branchId} onChange={(id) => { setBranchId(id); loadCounts(id); }} testPrefix="notify-branch" /></div>
           <Chips options={AUDIENCES.map((a) => ({ id: a.id, name: `${a.name} (${counts?.[a.id] ?? "…"})` }))} value={audience} onChange={setAudience} testPrefix="notify-audience" />
           <p className="meta mt-8">{AUDIENCES.find((a) => a.id === audience)?.sub}{branchId && audience === "all" ? " (with a branch picked, only linked phones count)" : ""}</p>
         </div>
@@ -79,7 +76,7 @@ export default function Notifications() {
           <div className="card-title">Message</div>
           <div className="chips mt-8">
             {TEMPLATES.map((t) => (
-              <button type="button" key={t.title} className="chip" onClick={() => { setTitle(t.title); setBody(t.body); }}>{t.title}</button>
+              <button type="button" key={t.title} className="chip" onClick={() => { setTitle(t.title); setBody(t.body); }}><Sparkles style={{ width: 15, height: 15, color: "var(--gold-700)" }} />{t.title}</button>
             ))}
           </div>
           <div className="mt-12">
@@ -90,25 +87,25 @@ export default function Notifications() {
               <textarea id="n-body" className="input" value={body} onChange={(e) => setBody(e.target.value)} maxLength={300} placeholder="Keep your QR pass ready on your phone." data-testid="notify-body-input" />
             </Field>
           </div>
-          <Button disabled={!ready} loading={!!sending} onClick={() => setConfirm(true)} testId="notify-send-btn">
+          <Button disabled={!ready} icon={<Send />} loading={!!sending} onClick={() => setConfirm(true)} testId="notify-send-btn">
             {n > 0 ? `Send to ${n} device${n === 1 ? "" : "s"}` : "No devices in this group yet"}
           </Button>
           {sending ? <p className="meta mt-8" data-testid="notify-progress">Sending… {sending.sent} delivered so far</p> : null}
-          {done ? <div className="notice" data-testid="notify-done">{done}</div> : null}
-          {err ? <p className="err" data-testid="notify-error">{err}</p> : null}
+          {done ? <Alert tone="success" testId="notify-done">{done}</Alert> : null}
+          {err ? <Alert tone="error" testId="notify-error">{err}</Alert> : null}
         </div>
-        <p className="meta mt-16">Students turn reminders on from their pass or registration page. On iPhone this only works after they add OLAM 3.0 to the Home Screen (iOS 16.4 or later).</p>
-      </main>
+        <div className="mt-16"><Alert tone="info">Students turn reminders on from their pass or registration page. On iPhone this only works after they add OLAM 3.0 to the Home Screen (iOS 16.4 or later).</Alert></div>
 
       <Modal open={confirm} onClose={() => setConfirm(false)}>
+        <div className="modal-ico" style={{ background: "var(--blue-100)", color: "var(--blue-600)" }}><BellRing /></div>
         <h2>Send this reminder?</h2>
         <p className="sub"><strong>{title}</strong><br />{body}</p>
         <p className="meta mt-12">To {n} device{n === 1 ? "" : "s"} • {AUDIENCES.find((a) => a.id === audience)?.name}{branchId ? ` • ${branches.find((b) => b.id === branchId)?.name}` : ""}. This can't be recalled.</p>
-        <div className="row mt-16">
-          <Button variant="ghost" onClick={() => setConfirm(false)} testId="notify-cancel-btn">Cancel</Button>
-          <Button onClick={send} testId="notify-confirm-btn">Send</Button>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={() => setConfirm(false)} testId="notify-cancel-btn">Cancel</Button>
+          <Button icon={<Send />} onClick={send} testId="notify-confirm-btn">Send</Button>
         </div>
       </Modal>
-    </div>
+    </StaffShell>
   );
 }
