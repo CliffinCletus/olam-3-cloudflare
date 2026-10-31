@@ -277,10 +277,8 @@ textarea.input { min-height: 100px; resize: vertical; line-height: 1.5; }
 .landing-top { display: flex; justify-content: flex-end; padding: calc(var(--safe-top) + 10px) 12px 0; }
 .landing-hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 8px 20px 24px; max-width: 520px; margin: 0 auto; width: 100%; }
 .landing-logo { width: min(62vw, 250px); height: auto; filter: drop-shadow(0 12px 24px rgba(193, 34, 42, 0.18)); animation: rise 0.5s ease-out; }
-.landing-hero .eyebrow { margin-top: 18px; }
-.landing-hero h1 { font-size: clamp(40px, 12vw, 56px); margin-top: 4px; line-height: 1; }
-.landing-hero .tagline { font-family: var(--display); font-style: italic; color: var(--c-600); font-size: 20px; margin-top: 6px; }
-.landing-hero .lead { color: var(--text-2); font-size: 15px; margin: 14px auto 0; max-width: 360px; }
+.landing-hero .eyebrow { margin-bottom: 16px; font-size: 12px; letter-spacing: 0.22em; }
+.landing-hero .lead { color: var(--text-2); font-size: 15px; margin: 18px auto 0; max-width: 360px; }
 .landing-actions { width: 100%; max-width: 400px; display: grid; gap: 10px; margin-top: 26px; }
 .landing-feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 400px; margin-top: 26px; }
 .landing-feats div { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-2); }

@@ -27,9 +27,9 @@ export default function Landing() {
           <Button variant="ghost" small block={false} icon={<LogIn />} onClick={() => nav("/staff/login")} testId="landing-staff-login-btn">Staff sign in</Button>
         </div>
         <div className="landing-hero">
-          <img className="landing-logo" src="/logo-mark.webp" alt="ഓളം 3.0 — A Grand Wedding" width={250} height={361} />
           <div className="eyebrow">Delta Academy presents</div>
-          <h1>OLAM 3.0</h1>
+          <h1 className="sr-only">OLAM 3.0 – A Grand Wedding</h1>
+          <img className="landing-logo" src="/logo-mark.webp" alt="ഓളം 3.0 — A Grand Wedding" width={250} height={361} />
           <p className="lead">The inter-branch arts festival. Register online and get your digital entry pass.</p>
           {open === false ? <div className="closed-note"><Lock />Registration is closed</div> : null}
 
