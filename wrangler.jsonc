@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "account_id": "6bd8375c7cca4fd8eaf69bd021930752",
   "workers_dev": true,
+  "routes": [{ "pattern": "olam3-0.petryxion.com", "custom_domain": true }],
   "observability": { "enabled": true },
 
   // The React PWA (built by Vite into ./dist) is served as static assets.
