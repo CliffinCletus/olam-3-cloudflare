@@ -7,7 +7,7 @@ Hono API under `/api/*` (`run_worker_first: ["/api/*"]`, SPA fallback for everyt
 - `npm run dev` — build the app, run `wrangler dev` on :8787 with local D1 (needs `.dev.vars`, see `.dev.vars.example`).
 - `npm run test:api` — end-to-end API tests against :8787 (`node --test`). Keep them green.
 - `npm run typecheck` — app + worker.
-- `npm run deploy` — `vite build && wrangler deploy` (account `6d9e3d29acf08caf7195b62ad23d3f77`).
+- `npm run deploy` — `vite build && wrangler deploy` (account `6bd8375c7cca4fd8eaf69bd021930752` (Petryxion)).
 - New schema change → add `migrations/000N_*.sql`, then `npm run db:migrate:local` and `npm run db:migrate` (remote).
 
 ## Conventions

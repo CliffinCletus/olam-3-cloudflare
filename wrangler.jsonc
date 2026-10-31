@@ -4,7 +4,7 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "account_id": "6d9e3d29acf08caf7195b62ad23d3f77",
+  "account_id": "6bd8375c7cca4fd8eaf69bd021930752",
   "workers_dev": true,
   "observability": { "enabled": true },
 
@@ -21,7 +21,7 @@
     {
       "binding": "DB",
       "database_name": "olam3-db",
-      "database_id": "8cc22c84-891f-437f-8d8d-d2fa356a8129",
+      "database_id": "c4dc1b59-8ded-41d7-8960-4d278ccbed8b",
       "migrations_dir": "migrations"
     }
   ],
