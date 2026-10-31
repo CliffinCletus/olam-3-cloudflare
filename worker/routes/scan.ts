@@ -1,8 +1,8 @@
 // Gate scanning, attendance log and recent check-ins.
 import { Hono } from "hono";
 import { z } from "zod";
-import { type AppEnv, type User, audit, canExport, coordinatorBranch, displayName, requireRoles, secret } from "../lib/ctx";
-import { csvResponse, hashPassToken, newId, nowIso, readBody, toCsv } from "../lib/util";
+import { type AppEnv, type User, audit, canExport, coordinatorBranch, displayName, getSettings, requireRoles, secret } from "../lib/ctx";
+import { csvResponse, fail, hashPassToken, newId, nowIso, readBody, toCsv } from "../lib/util";
 import type { Env } from "../lib/util";
 
 const scan = new Hono<AppEnv>();
@@ -58,9 +58,16 @@ const ScanIn = z.object({
   station: z.string().max(50).nullish(),
 });
 
-scan.post("/scan", requireRoles("super_admin", "coordinator", "scanner"), async (c) => {
+// Only gate scanners and super admins scan; coordinators just see the check-in log.
+const scanStaff = requireRoles("super_admin", "scanner");
+const CHECKIN_CLOSED = "Check-in hasn't started yet. A super admin has to open check-in first.";
+
+scan.get("/scan/status", scanStaff, async (c) => c.json({ checkin_open: (await getSettings(c.env.DB)).checkin_open }));
+
+scan.post("/scan", scanStaff, async (c) => {
   const user = c.get("user");
   const body = await readBody(c.req.raw, ScanIn);
+  if (!(await getSettings(c.env.DB)).checkin_open) fail(409, CHECKIN_CLOSED);
   const station = body.station || "station-1";
   const res = await doScan(c.env, body.token, station, user);
   if (res.result !== "VALID") {
@@ -125,15 +132,13 @@ scan.get("/export/attendance.csv", requireRoles("super_admin", "coordinator"), a
   return csvResponse(csv, `olam-attendance-${view}.csv`);
 });
 
-scan.get("/scan/history", requireRoles("super_admin", "coordinator", "scanner"), async (c) => {
-  const branchId = coordinatorBranch(c.get("user"));
+scan.get("/scan/history", scanStaff, async (c) => {
   const { results } = await c.env.DB
     .prepare(
       `SELECT a.*, r.full_name, r.reference, r.batch, b.name AS branch_name
        FROM attendance a JOIN registrations r ON r.id = a.registration_id LEFT JOIN branches b ON b.id = r.branch_id
-       ${branchId ? "WHERE r.branch_id = ?" : ""} ORDER BY a.checked_in_at DESC LIMIT 100`,
+       ORDER BY a.checked_in_at DESC LIMIT 100`,
     )
-    .bind(...(branchId ? [branchId] : []))
     .all();
   return c.json(results);
 });

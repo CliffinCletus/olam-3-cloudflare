@@ -114,6 +114,36 @@ test("registration validation and unique email + phone", async () => {
   assert.match(samePhone.data.detail, /mobile/i);
 });
 
+test("check-in switch: only super admins toggle; closed refuses scans; coordinators cannot scan", async () => {
+  const t = await adminToken();
+  const sc = await makeStaff("scanner");
+  const coord = await makeStaff("coordinator", { branch_id: "br-2" });
+
+  assert.equal((await call("/settings/checkin", { method: "PUT", token: sc.token, body: { open: true } })).status, 403);
+  assert.equal((await call("/settings/checkin", { method: "PUT", token: coord.token, body: { open: true } })).status, 403);
+
+  const closed = await call("/settings/checkin", { method: "PUT", token: t, body: { open: false } });
+  assert.equal(closed.status, 200);
+  assert.equal(closed.data.checkin_open, false);
+  assert.equal((await call("/scan/status", { token: sc.token })).data.checkin_open, false);
+  const refused = await call("/scan", { method: "POST", token: sc.token, body: { token: "OLM-ZZZZZZ" } });
+  assert.equal(refused.status, 409);
+  assert.match(refused.data.detail, /check-in/i);
+  assert.equal((await call("/scan", { method: "POST", token: t, body: { token: "OLM-ZZZZZZ" } })).status, 409);
+
+  const opened = await call("/settings/checkin", { method: "PUT", token: t, body: { open: true } });
+  assert.equal(opened.data.checkin_open, true);
+  assert.equal((await call("/settings", { token: t })).data.checkin_open, true);
+  assert.equal((await call("/scan/status", { token: t })).data.checkin_open, true);
+  assert.equal((await call("/scan", { method: "POST", token: sc.token, body: { token: "OLM-ZZZZZZ" } })).data.result, "INVALID");
+
+  // Coordinators have no scanner at all, but still see the check-in log.
+  assert.equal((await call("/scan", { method: "POST", token: coord.token, body: { token: "OLM-ZZZZZZ" } })).status, 403);
+  assert.equal((await call("/scan/history", { token: coord.token })).status, 403);
+  assert.equal((await call("/scan/status", { token: coord.token })).status, 403);
+  assert.equal((await call("/attendance", { token: coord.token })).status, 200);
+});
+
 test("full flow: lookup, approve, pass verify, scan, duplicate, reject revokes", async () => {
   const t = await adminToken();
   const body = regBody();

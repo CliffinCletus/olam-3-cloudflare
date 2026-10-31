@@ -172,6 +172,7 @@ export async function getSettings(db: D1Database) {
   const s = await db.prepare("SELECT * FROM settings WHERE id = 'event'").first<any>();
   return {
     registration_open: s ? !!s.registration_open : true,
+    checkin_open: s ? !!s.checkin_open : false,
     closed_message: s?.closed_message || DEFAULT_CLOSED,
     privacy_notice: s?.privacy_notice || DEFAULT_PRIVACY,
     event_date: s?.event_date ?? null,

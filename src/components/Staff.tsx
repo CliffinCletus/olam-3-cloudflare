@@ -9,7 +9,7 @@ import { Modal, Select } from "./ui";
 
 /**
  * Loads the signed-in staff user (refreshing from /auth/me) and redirects when not allowed.
- * `roles` = who may see this page. Scanners are sent to the scanner.
+ * `roles` = who may see this page. Scanners are sent to the scanner, coordinators to their dashboard.
  */
 export function useStaff(roles: Role[] = ["super_admin", "coordinator"]) {
   const nav = useNavigate();
@@ -25,7 +25,7 @@ export function useStaff(roles: Role[] = ["super_admin", "coordinator"]) {
     const u = getUser();
     if (!u) { nav("/staff/login", { replace: true }); return; }
     if (u.must_change_password) { nav("/staff/change-password", { replace: true }); return; }
-    if (!roles.includes(u.role)) { nav(u.role === "scanner" ? "/staff/scanner" : "/staff/login", { replace: true }); return; }
+    if (!roles.includes(u.role)) { nav(u.role === "scanner" ? "/staff/scanner" : u.role === "coordinator" ? "/staff/dashboard" : "/staff/login", { replace: true }); return; }
     api<AuthUser>("/auth/me").then((me) => { updateUser(me); setUser(me); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -60,12 +60,12 @@ export function BranchFilter({ user, branches, value, onChange, testPrefix }: {
 export const canExportCsv = (u: AuthUser | null) => u?.role === "super_admin" || !!u?.can_export;
 
 // --- Navigation ----------------------------------------------------------------------------------
-type NavItem = { key: string; to: string; label: string; icon: ReactNode; admin?: boolean };
+type NavItem = { key: string; to: string; label: string; icon: ReactNode; admin?: boolean; noCoordinator?: boolean };
 const NAV: { group: string; items: NavItem[] }[] = [
   { group: "Event", items: [
     { key: "overview", to: "/staff/dashboard", label: "Overview", icon: <LayoutDashboard /> },
     { key: "regs", to: "/staff/dashboard?tab=regs", label: "Registrations", icon: <Users /> },
-    { key: "scanner", to: "/staff/scanner", label: "Gate scanner", icon: <ScanLine /> },
+    { key: "scanner", to: "/staff/scanner", label: "Gate scanner", icon: <ScanLine />, noCoordinator: true },
   ] },
   { group: "Attendance", items: [
     { key: "attendance", to: "/staff/attendance", label: "Check-in log", icon: <ClipboardCheck /> },
@@ -101,7 +101,8 @@ export function StaffShell({ user, title, sub, actions, children }: {
   const desktop = useMedia("(min-width: 1024px)");
   const [more, setMore] = useState(false);
   const isAdmin = user?.role === "super_admin";
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.admin || isAdmin) })).filter((g) => g.items.length);
+  const canScan = user?.role !== "coordinator";
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => (!i.admin || isAdmin) && (!i.noCoordinator || canScan)) })).filter((g) => g.items.length);
   const current = activeKey(loc.pathname, loc.search);
   const go = (to: string) => { setMore(false); nav(to); };
   const signOut = () => { clearSession(); nav("/staff/login", { replace: true }); };
@@ -170,7 +171,7 @@ export function StaffShell({ user, title, sub, actions, children }: {
           <nav className="bottom-nav" aria-label="Main navigation">
             <button type="button" className={current === "overview" ? "on" : ""} onClick={() => go("/staff/dashboard")} data-testid="nav-overview"><LayoutDashboard /><span>Home</span></button>
             <button type="button" className={current === "regs" ? "on" : ""} onClick={() => go("/staff/dashboard?tab=regs")} data-testid="nav-regs"><Users /><span>Students</span></button>
-            <button type="button" className={`scan ${current === "scanner" ? "on" : ""}`} onClick={() => go("/staff/scanner")} data-testid="nav-scanner"><span className="bubble"><ScanLine /></span><span>Scan</span></button>
+            {canScan ? <button type="button" className={`scan ${current === "scanner" ? "on" : ""}`} onClick={() => go("/staff/scanner")} data-testid="nav-scanner"><span className="bubble"><ScanLine /></span><span>Scan</span></button> : null}
             <button type="button" className={current === "attendance" ? "on" : ""} onClick={() => go("/staff/attendance")} data-testid="nav-attendance"><ClipboardCheck /><span>Check-ins</span></button>
             <button type="button" className={more ? "on" : ""} onClick={() => setMore(true)} data-testid="nav-more"><Menu /><span>More</span></button>
           </nav>

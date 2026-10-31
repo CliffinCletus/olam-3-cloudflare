@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, put } from "../../api";
-import { CalendarDays, Lock, MapPin, Save, Unlock } from "lucide-react";
+import { CalendarDays, Lock, MapPin, Save, ScanLine, Unlock } from "lucide-react";
 import { StaffShell, useStaff } from "../../components/Staff";
 import { Alert, Button, Field, Spinner, Toggle, WithIcon, fmtDateTime } from "../../components/ui";
 
-type Settings = { registration_open: boolean; closed_message: string; privacy_notice: string; event_date: string | null; event_time_venue: string | null; updated_at?: string | null; updated_by_name?: string | null };
+type Settings = { registration_open: boolean; checkin_open: boolean; closed_message: string; privacy_notice: string; event_date: string | null; event_time_venue: string | null; updated_at?: string | null; updated_by_name?: string | null };
 
 export default function EventSettings() {
   const me = useStaff(["super_admin"]);
@@ -17,6 +17,17 @@ export default function EventSettings() {
     if (!me) return;
     api<Settings>("/settings").then((r) => { setS(r); setSaved(r); }).catch((e) => setMsg({ ok: false, text: e.message }));
   }, [me]);
+
+  async function setCheckin(open: boolean) {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await put<Settings>("/settings/checkin", { open });
+      setS((cur) => (cur ? { ...cur, checkin_open: r.checkin_open, updated_at: r.updated_at, updated_by_name: r.updated_by_name } : r));
+      setSaved(r);
+      setMsg({ ok: true, text: open ? "Check-in opened — scanners can admit students now." : "Check-in closed." });
+    } catch (e: any) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  }
 
   async function save(next: Settings, okText = "Settings saved.") {
     setBusy(true); setMsg(null);
@@ -50,7 +61,21 @@ export default function EventSettings() {
                 sub={<span style={{ color: s.registration_open ? "var(--olive-700)" : "var(--c-700)", fontWeight: 700 }} data-testid="event-registration-state">{s.registration_open ? "OPEN — students can register" : "CLOSED — new registrations blocked"}</span>}
                 testId="event-registration-toggle"
               /></div></div>
-              <p className="meta mt-8">Closing only stops new registrations. Approvals, passes and scanning keep working.</p>
+              <p className="meta mt-8">Closing only stops new registrations. Approvals and passes keep working.</p>
+            </div>
+
+            <div className="card mt-16">
+              <div className="row" style={{ gap: 12 }}>
+              <span className="lead-ico" style={{ width: 42, height: 42, borderRadius: 12, display: "grid", placeItems: "center", flex: "0 0 42px", background: s.checkin_open ? "var(--olive-100)" : "var(--c-100)", color: s.checkin_open ? "var(--olive-700)" : "var(--c-700)" }}>{s.checkin_open ? <ScanLine /> : <Lock />}</span>
+              <div style={{ flex: 1 }}><Toggle
+                on={s.checkin_open}
+                disabled={busy}
+                onClick={() => setCheckin(!saved.checkin_open)}
+                title="Gate check-in"
+                sub={<span style={{ color: s.checkin_open ? "var(--olive-700)" : "var(--c-700)", fontWeight: 700 }} data-testid="event-checkin-state">{s.checkin_open ? "OPEN — gate scanners can admit students" : "CLOSED — every scan is refused"}</span>}
+                testId="event-checkin-toggle"
+              /></div></div>
+              <p className="meta mt-8">Turn this on when the gates open. Only gate scanners and admins can scan; branch coordinators see the check-in log.</p>
             </div>
 
             <div className="card mt-16">

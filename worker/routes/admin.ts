@@ -61,6 +61,20 @@ admin.put("/settings", superAdmin, async (c) => {
   return c.json(await getSettings(c.env.DB));
 });
 
+/** Opens or closes gate check-in. While closed, /scan refuses every pass. */
+admin.put("/settings/checkin", superAdmin, async (c) => {
+  const user = c.get("user");
+  const b = await readBody(c.req.raw, z.object({ open: z.boolean({ error: "open must be true or false" }) }));
+  await c.env.DB.prepare(
+    `INSERT INTO settings (id, checkin_open, updated_at, updated_by_name) VALUES ('event', ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET checkin_open = excluded.checkin_open, updated_at = excluded.updated_at, updated_by_name = excluded.updated_by_name`,
+  )
+    .bind(b.open ? 1 : 0, nowIso(), displayName(user))
+    .run();
+  await audit(c.env.DB, user.id, b.open ? "checkin.open" : "checkin.close", "event");
+  return c.json(await getSettings(c.env.DB));
+});
+
 // --- Branches ---------------------------------------------------------------------------
 const BranchIn = z.object({
   name: z.string().trim().min(1, { error: "Name cannot be blank" }).max(80),

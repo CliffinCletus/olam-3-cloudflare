@@ -199,10 +199,12 @@ export default function Dashboard() {
                   <span className="ico" style={{ background: "var(--yellow-100)", color: "var(--yellow-800)" }}><Clock /></span>
                   <span><b>Review pending</b><span className="d">{stats.pending} waiting for approval</span></span><ChevronRight />
                 </button>
-                <button type="button" onClick={() => nav("/staff/scanner")}>
-                  <span className="ico" style={{ background: "var(--c-100)", color: "var(--c-700)" }}><ScanLine /></span>
-                  <span><b>Open gate scanner</b><span className="d">Scan student passes at the entrance</span></span><ChevronRight />
-                </button>
+                {user?.role === "super_admin" ? (
+                  <button type="button" onClick={() => nav("/staff/scanner")} data-testid="dashboard-scanner-btn">
+                    <span className="ico" style={{ background: "var(--c-100)", color: "var(--c-700)" }}><ScanLine /></span>
+                    <span><b>Open gate scanner</b><span className="d">Scan passes and start or stop check-in</span></span><ChevronRight />
+                  </button>
+                ) : null}
                 <button type="button" onClick={() => nav("/staff/absent")}>
                   <span className="ico" style={{ background: "var(--gold-100)", color: "var(--gold-700)" }}><UserX /></span>
                   <span><b>Not arrived yet</b><span className="d">Call or WhatsApp latecomers</span></span><ChevronRight />
