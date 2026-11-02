@@ -6,7 +6,7 @@ import { PushOptIn } from "../components/PushOptIn";
 import { QRPassCard } from "../components/QRPassCard";
 import { StudentScreen } from "../components/StudentScreen";
 import { Alert, Button, Spinner } from "../components/ui";
-import { type SavedPass, forgetMe, forgetPass, formatEventDate, loadMe, loadPass, savePass } from "../lib/pass";
+import { type SavedPass, forgetMe, forgetPass, formatEventDate, loadMe, loadPass, passSavedOnDevice, savePass } from "../lib/pass";
 import { makePassPng, passImageName, sharePassImage } from "../lib/pass-image";
 import { deliverPdf, makePassPdf, passFileName } from "../lib/pass-pdf";
 
@@ -91,6 +91,7 @@ export default function Pass() {
       ) : null}
       {pass && r ? (
         <>
+          {!passSavedOnDevice() ? <div className="offline-note"><Alert tone="warning" testId="pass-not-saved">This browser isn't saving your pass on this phone. Tap Download below to keep a copy, or open the site in Chrome or Safari.</Alert></div> : null}
           {offline ? <div className="offline-note"><Alert tone="warning" testId="pass-offline">You're offline — showing the pass saved on this phone. It still scans at the gate.</Alert></div> : null}
           <QRPassCard token={pass.token} name={r.full_name} reference={r.reference} branch={r.branch_name || ""} batch={r.batch} eventDate={pass.event?.event_date} venue={pass.event?.event_time_venue} />
           <div className="pass-actions">

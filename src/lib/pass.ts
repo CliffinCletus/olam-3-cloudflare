@@ -6,18 +6,36 @@ export type SavedPass = { token: string; registration: Registration; event?: Eve
 
 const key = (ref: string) => `olam3_pass_${ref.toUpperCase().replace(/[^A-Z0-9-]/g, "")}`;
 
+// Some browsers block localStorage (WhatsApp / Instagram in-app browsers, private tabs, blocked site data).
+// Every write is mirrored in memory so the pass still opens in this tab; it just won't survive a reload.
+const mem = new Map<string, string>();
+let persisted = true;
+function store(k: string, v: string | null) {
+  if (v === null) mem.delete(k); else mem.set(k, v);
+  try {
+    if (v === null) localStorage.removeItem(k);
+    else { localStorage.setItem(k, v); persisted = localStorage.getItem(k) === v; }
+  } catch { if (v !== null) persisted = false; }
+}
+function fetchKey(k: string): string | null {
+  try { const v = localStorage.getItem(k); if (v !== null) return v; } catch { /* storage blocked */ }
+  return mem.get(k) ?? null;
+}
+/** False when the last save only reached memory: the student should download the pass. */
+export const passSavedOnDevice = () => persisted;
+
 /** The token lives on this device only (never in the URL). */
 export function savePass(p: Omit<SavedPass, "saved_at">) {
-  try { localStorage.setItem(key(p.registration.reference), JSON.stringify({ ...p, saved_at: new Date().toISOString() })); } catch { /* storage blocked */ }
+  store(key(p.registration.reference), JSON.stringify({ ...p, saved_at: new Date().toISOString() }));
 }
 export function loadPass(ref: string): SavedPass | null {
   try {
-    const raw = localStorage.getItem(key(ref));
+    const raw = fetchKey(key(ref));
     return raw ? (JSON.parse(raw) as SavedPass) : null;
   } catch { return null; }
 }
 export function forgetPass(ref: string) {
-  try { localStorage.removeItem(key(ref)); } catch { /* ignore */ }
+  store(key(ref), null);
 }
 
 // --- The student on this device: the app reopens straight to their status / pass ----------
@@ -25,11 +43,11 @@ export type Me = { email: string; mobile: string; reference?: string };
 const ME_KEY = "olam3_me";
 
 export function saveMe(me: Me) {
-  try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch { /* storage blocked */ }
+  store(ME_KEY, JSON.stringify(me));
 }
 export function loadMe(): Me | null {
   try {
-    const raw = localStorage.getItem(ME_KEY);
+    const raw = fetchKey(ME_KEY);
     const me = raw ? (JSON.parse(raw) as Me) : null;
     return me?.email && me?.mobile ? me : null;
   } catch { return null; }
@@ -38,7 +56,7 @@ export function loadMe(): Me | null {
 export function forgetMe() {
   const me = loadMe();
   if (me?.reference) forgetPass(me.reference);
-  try { localStorage.removeItem(ME_KEY); } catch { /* ignore */ }
+  store(ME_KEY, null);
 }
 
 // --- QR with the OLAM logo in the middle ---------------------------------------------------
