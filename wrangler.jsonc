@@ -28,11 +28,10 @@
   ],
 
   "vars": {
-    // The first super admin is created on the first sign-in with this email + the INITIAL_ADMIN_PASSWORD secret.
-    "INITIAL_ADMIN_EMAIL": "cliffincliffin@gmail.com",
     "JWT_ISSUER": "olam3-api"
   }
   // Secrets (set with `npm run secrets` or `npx wrangler secret put <NAME>`):
   //   JWT_SECRET              random string, signs staff sessions and derives QR pass tokens
+  //   INITIAL_ADMIN_EMAIL     the first super admin, created on its first sign-in with INITIAL_ADMIN_PASSWORD
   //   INITIAL_ADMIN_PASSWORD  bootstrap password for INITIAL_ADMIN_EMAIL (must be changed on first sign-in)
 }

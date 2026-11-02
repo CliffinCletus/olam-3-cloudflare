@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const BASE = process.env.BASE || "http://127.0.0.1:8787";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "cliffincliffin@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 const BOOT_PW = process.env.ADMIN_BOOT_PW || "Bootstrap123";
 const ADMIN_PW = process.env.ADMIN_PW || "AdminPass12345";
 const RUN = Math.random().toString(36).slice(2, 8);

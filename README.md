@@ -8,6 +8,28 @@ The app is an installable PWA that also works offline at the venue.
 
 **Live:** https://olam3-0.petryxion.com
 
+<p align="center">
+  <img src="docs/screenshots/landing.png" alt="Landing page" width="240">
+  &nbsp;
+  <img src="docs/screenshots/pass.png" alt="Student QR entry pass" width="240">
+  &nbsp;
+  <img src="docs/screenshots/scanner.png" alt="Gate scanner with check-in switch" width="240">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Admin dashboard" width="800">
+</p>
+
+<details>
+<summary>More screenshots</summary>
+<br>
+<p align="center">
+  <img src="docs/screenshots/attendance.png" alt="Check-in log with refused scans" width="800">
+</p>
+</details>
+
+<sub>Screenshots use made-up demo data.</sub>
+
 ---
 
 ## Contents
@@ -83,7 +105,7 @@ npm run dev                           # build + wrangler dev → http://127.0.0.
 ```
 
 Then open `http://127.0.0.1:8787/staff/login`, choose **Admin**, and sign in with `INITIAL_ADMIN_EMAIL`
-(from `wrangler.jsonc`) and `INITIAL_ADMIN_PASSWORD` (from `.dev.vars`). You'll be asked to set a new password.
+and `INITIAL_ADMIN_PASSWORD` from `.dev.vars` (`admin@example.com` / `Bootstrap123` in the example file). You'll be asked to set a new password.
 
 For frontend work with hot reload, keep `npm run dev` running and start `npm run dev:ui` in a second terminal.
 It serves the app on `:5173` and forwards `/api` to `:8787`.
@@ -107,18 +129,18 @@ npm run deploy         # vite build && wrangler deploy
 First deploy only:
 
 ```bash
-npm run secrets        # sets JWT_SECRET (random) + INITIAL_ADMIN_PASSWORD (you type it)
+npm run secrets        # asks for the main admin email + password, generates JWT_SECRET
 npm run vapid          # VAPID key pair for push reminders, stored as Worker secrets
 ```
 
 > Changing `JWT_SECRET` signs everyone out **and invalidates every issued QR pass**.
-> To change only the bootstrap admin password, use `npm run secrets -- --keep-jwt`.
+> To change only the main admin email or password, use `npm run secrets -- --keep-jwt`.
 
 ### Configuration
 
 | Name | Kind | Purpose |
 |---|---|---|
-| `INITIAL_ADMIN_EMAIL` | var (`wrangler.jsonc`) | The first super admin, created on its first sign-in |
+| `INITIAL_ADMIN_EMAIL` | secret | The first super admin, created on its first sign-in |
 | `JWT_ISSUER` | var | JWT issuer claim |
 | `JWT_SECRET` | secret | Signs staff sessions and derives QR pass tokens |
 | `INITIAL_ADMIN_PASSWORD` | secret | Bootstrap password for `INITIAL_ADMIN_EMAIL` (must be changed at first sign-in) |
