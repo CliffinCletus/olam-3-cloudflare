@@ -1,5 +1,9 @@
 # OLAM 3.0 — Event Registration & Gate Check-in
 
+[![CI](https://github.com/CliffinCletus/olam-3-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/CliffinCletus/olam-3-cloudflare/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/CliffinCletus/olam-3-cloudflare/actions/workflows/codeql.yml/badge.svg)](https://github.com/CliffinCletus/olam-3-cloudflare/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-C1222A.svg)](LICENSE)
+
 Registration, QR entry passes and gate check-in for **OLAM 3.0 – A Grand Wedding** (Delta Academy).
 
 Students register from their phone and get a QR pass once approved. Gate staff scan the passes at the venue,
@@ -44,6 +48,7 @@ The app is an installable PWA that also works offline at the venue.
 - [API overview](#api-overview)
 - [Security](#security)
 - [Installing on phones](#installing-on-phones)
+- [License](#license)
 
 ---
 
@@ -94,7 +99,7 @@ The app sends no email. Students download their pass or get it back with their e
 
 ## Getting started (local)
 
-Requires **Node 20+**.
+Requires **Node 22+** (Wrangler 4 needs it).
 
 ```bash
 npm install
@@ -147,6 +152,19 @@ npm run vapid          # VAPID key pair for push reminders, stored as Worker sec
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | secrets | Web Push keys |
 
 The Worker serves the custom domain `olam3-0.petryxion.com` (`routes` in `wrangler.jsonc`) as well as `*.workers.dev`.
+
+### GitHub Actions
+
+| Workflow | Runs on | What it does |
+|---|---|---|
+| [CI](.github/workflows/ci.yml) | every push to `main` and every pull request | Typecheck, build, start the Worker with a throwaway local D1, run all API tests |
+| [Deploy](.github/workflows/deploy.yml) | manual (*Actions → Deploy → Run workflow*) | Runs CI, applies D1 migrations, deploys, then checks `/api/health` on the live site |
+| [CodeQL](.github/workflows/codeql.yml) | pushes, pull requests, weekly | Security scan of the JavaScript / TypeScript code |
+| [Dependabot](.github/dependabot.yml) | weekly | Pull requests for npm and Actions updates (minor + patch grouped) |
+
+Deploying from GitHub needs one repository secret, `CLOUDFLARE_API_TOKEN`. Create it in the Cloudflare dashboard
+(*My Profile → API Tokens*) with **Workers Scripts: Edit** and **D1: Edit** for the account.
+The Worker's own secrets (admin email/password, `JWT_SECRET`, VAPID keys) stay on Cloudflare and never go into GitHub.
 
 ## Database & migrations
 
@@ -254,3 +272,8 @@ Every error comes back as `{ "detail": "<message>" }`, and the app shows that me
 - **iPhone (Safari):** Share → **Add to Home Screen**. The landing page shows these steps.
 
 The camera scanner needs HTTPS, which the custom domain and `*.workers.dev` both provide.
+
+## License
+
+The code is released under the [MIT License](LICENSE). The OLAM 3.0 name, the "A Grand Wedding" artwork, the Delta Academy name
+and the logo files in `public/` belong to their owners and are **not** covered by it. The fonts keep their SIL Open Font License.

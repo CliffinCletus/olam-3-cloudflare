@@ -1,0 +1,65 @@
+name: Deploy
+
+# Manual on purpose: this is a live event app, so a person decides when it ships.
+# Actions → Deploy → Run workflow. Needs the CLOUDFLARE_API_TOKEN repository secret.
+on:
+  workflow_dispatch:
+    inputs:
+      migrate:
+        description: Apply pending D1 migrations before deploying
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://olam3-0.petryxion.com
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check the API token is set
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Add a CLOUDFLARE_API_TOKEN repository secret (Workers Scripts: Edit + D1: Edit)."
+            exit 1
+          fi
+
+      - name: Apply D1 migrations (remote)
+        if: ${{ inputs.migrate }}
+        run: npm run db:migrate
+
+      - name: Build and deploy
+        run: npm run deploy
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf https://olam3-0.petryxion.com/api/health; then exit 0; fi
+            sleep 3
+          done
+          echo "::error::Health check failed after deploy"; exit 1

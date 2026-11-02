@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call: # reused by deploy.yml so nothing ships without passing tests
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, build & API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck (app + worker)
+        run: npm run typecheck
+
+      - name: Build the PWA
+        run: npm run build
+
+      - name: Local secrets for wrangler dev
+        # Example values + a fresh VAPID pair (the push test needs real keys). Nothing here is a production secret.
+        run: |
+          grep -v '^VAPID_' .dev.vars.example > .dev.vars
+          npm run --silent vapid -- --print >> .dev.vars
+
+      - name: Create the local D1 database
+        run: npm run db:migrate:local
+
+      - name: Start the Worker
+        run: |
+          npx wrangler dev --port 8787 --ip 127.0.0.1 > wrangler-dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8787/api/health > /dev/null; then echo "Worker is up"; exit 0; fi
+            sleep 2
+          done
+          echo "Worker did not start"; cat wrangler-dev.log; exit 1
+
+      - name: End-to-end API tests
+        run: npm run test:api
+
+      - name: Worker log
+        if: failure()
+        run: cat wrangler-dev.log || true
