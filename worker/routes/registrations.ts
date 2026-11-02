@@ -102,7 +102,7 @@ const LookupIn = z.object({
 /** Public retrieval: email AND matching mobile number (or reference). Returns status and, if approved, the derived pass token. */
 regs.post("/registrations/lookup", async (c) => {
   const db = c.env.DB;
-  await rateLimit(db, "lookup-ip", clientIp(c), 15, 60);
+  await rateLimit(db, "lookup-ip", clientIp(c), 60, 60); // venue Wi-Fi: many students share one IP
   const body = await readBody(c.req.raw, LookupIn);
   const reg = await db.prepare(`${REG_SELECT} WHERE r.email = ?`).bind(body.email.toLowerCase()).first<any>();
   const matches = !!reg && (body.mobile
@@ -125,7 +125,7 @@ async function eventInfo(db: D1Database) {
 /** Student device shows the live pass using the token as proof of possession (in the body). Does NOT check in. */
 regs.post("/pass/verify", async (c) => {
   const db = c.env.DB;
-  await rateLimit(db, "verify-ip", clientIp(c), 30, 60);
+  await rateLimit(db, "verify-ip", clientIp(c), 300, 60);
   const body = await readBody(c.req.raw, z.object({ token: z.string().min(10).max(200) }));
   const th = await hashPassToken(secret(c.env), body.token);
   const p = await db.prepare("SELECT registration_id FROM passes WHERE token_hash = ? AND active = 1").bind(th).first<{ registration_id: string }>();

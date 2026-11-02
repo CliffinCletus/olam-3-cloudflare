@@ -35,8 +35,10 @@ export default function Pass() {
         setOffline(false);
       })
       .catch((e: ApiError) => {
-        if (e.status === 0) setOffline(true); // no signal at the venue: the saved QR still works at the gate
-        else { forgetPass(ref); setPass(null); setErr(e.message); }
+        // Only a revoked / unknown pass is dropped. No signal, "too many attempts" or a server hiccup
+        // keep showing the saved QR — it still scans at the gate.
+        if (e.status === 404 || e.status === 403) { forgetPass(ref); setPass(null); setErr(e.message); }
+        else if (e.status === 0) setOffline(true);
       });
   }, [ref, nav]);
 

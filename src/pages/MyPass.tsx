@@ -37,7 +37,8 @@ export default function MyPass() {
       setData(r);
     } catch (err: any) {
       const ref = loadMe()?.reference;
-      if (err.status === 0 && ref && loadPass(ref)) { nav(`/pass?ref=${encodeURIComponent(ref)}`, { replace: true }); return; }
+      // Any failure except "not found" (offline, busy, server error) falls back to the pass saved on this phone.
+      if (err.status !== 404 && err.status !== 422 && ref && loadPass(ref)) { nav(`/pass?ref=${encodeURIComponent(ref)}`, { replace: true }); return; }
       if (err.status === 404 && saved) { forgetMe(); setMe(null); }
       setError(err.message);
     } finally { setLoading(false); setAuto(false); }
