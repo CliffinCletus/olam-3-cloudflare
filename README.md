@@ -178,7 +178,7 @@ To recreate the database from scratch: `npx wrangler d1 create olam3-db`, put th
 | `npm run typecheck` | TypeScript check for app + worker |
 | `npm run test:api` | End-to-end API tests against :8787 |
 | `npm run db:migrate:local` / `db:migrate` | Apply D1 migrations locally / remotely |
-| `npm run secrets` | Upload `JWT_SECRET` + `INITIAL_ADMIN_PASSWORD` |
+| `npm run secrets` | Upload `INITIAL_ADMIN_EMAIL` + `INITIAL_ADMIN_PASSWORD` + a random `JWT_SECRET` (`-- --keep-jwt` keeps the current one) |
 | `npm run vapid` | Generate VAPID keys and upload them (`-- --print` to print them for `.dev.vars` instead) |
 | `npm run deploy` | Build and deploy the Worker |
 
